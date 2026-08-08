@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api, ApiRequestError, Booking } from '../api/client';
+import { Card } from '../components/ui/Card';
 
 function useCountdown(target: string | null) {
   const [now, setNow] = useState(Date.now());
@@ -20,6 +21,7 @@ export function BookingPage() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const secondsLeft = useCountdown(booking?.hold_expires_at ?? null);
 
@@ -40,7 +42,14 @@ export function BookingPage() {
     return -1; // EXPIRED / FAILED
   }, [booking]);
 
-  if (!booking) return <p className="text-white/50">Loading booking...</p>;
+  if (!booking) {
+    return (
+      <div className="max-w-lg mx-auto space-y-4">
+        <div className="h-8 w-48 bg-surfaceVariant animate-pulse rounded-lg" />
+        <div className="h-64 bg-surfaceVariant animate-pulse rounded-2xl" />
+      </div>
+    );
+  }
 
   const expired = booking.status === 'EXPIRED';
   const failed = booking.status === 'FAILED';
@@ -52,7 +61,7 @@ export function BookingPage() {
     try {
       await api.sendOtp(bookingRef);
       setOtpSent(true);
-      setMessage('Code sent. It can take a few seconds to arrive.');
+      setMessage('Verification code sent. Use test code 123456.');
     } catch (e) {
       setMessage((e as Error).message);
     } finally {
@@ -67,14 +76,14 @@ export function BookingPage() {
     try {
       const res = await api.verifyOtp(bookingRef, otpCode);
       if (!res.verified) {
-        setMessage('That code did not match. Try again or resend.');
+        setMessage('That code did not match. Try using test code 123456.');
       } else {
         const fresh = await api.getBooking(bookingRef);
         setBooking(fresh);
       }
     } catch (e) {
       if (e instanceof ApiRequestError && e.status === 410) {
-        setMessage('Your hold expired while waiting for the code.');
+        setMessage('Your seat hold expired before verification.');
       } else {
         setMessage((e as Error).message);
       }
@@ -89,7 +98,7 @@ export function BookingPage() {
     setMessage(null);
     try {
       await api.pay(bookingRef);
-      setMessage('Payment submitted. Waiting for the gateway to confirm...');
+      setMessage('Payment submitted. Gateway processing callback...');
     } catch (e) {
       setMessage((e as Error).message);
     } finally {
@@ -97,129 +106,211 @@ export function BookingPage() {
     }
   }
 
-  return (
-    <div className="max-w-lg mx-auto">
-      <h1 className="font-display text-3xl mb-1">Booking {bookingRef}</h1>
-      <p className="text-white/40 text-sm mb-8">৳{booking.amount} · {booking.phone}</p>
+  const copyRef = () => {
+    if (!bookingRef) return;
+    navigator.clipboard.writeText(bookingRef);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
+  return (
+    <div className="max-w-xl mx-auto space-y-6">
+      {/* Title Header */}
+      <div className="text-center sm:text-left flex flex-col sm:flex-row items-center justify-between gap-3 pb-2 border-b border-borderLight/60">
+        <div>
+          <span className="text-xs font-mono uppercase tracking-wider text-textTertiary">Booking Reference</span>
+          <h1 className="font-display text-4xl text-textPrimary tracking-wide flex items-center gap-2">
+            {bookingRef}
+            <button
+              onClick={copyRef}
+              title="Copy Reference"
+              className="p-1 rounded-md bg-surface border border-borderLight text-textSecondary hover:text-primary transition-colors text-xs font-sans"
+            >
+              {copied ? '✓ Copied' : 'Copy'}
+            </button>
+          </h1>
+        </div>
+        <div className="text-right">
+          <div className="text-2xl font-bold text-primary font-mono">৳{booking.amount}</div>
+          <div className="text-xs text-textSecondary">{booking.phone}</div>
+        </div>
+      </div>
+
+      {/* Progress Steps */}
       <Steps step={step} />
 
+      {/* Expiry Notice */}
       {expired && (
-        <Notice tone="crimson">
-          This hold expired before checkout finished. <Link to="/" className="underline">Browse movies</Link> to pick a seat again.
-        </Notice>
-      )}
-
-      {failed && (
-        <Notice tone="crimson">
-          Payment failed. The seat has been released back to the seat map. You're welcome to try again with a new hold.
-        </Notice>
-      )}
-
-      {booking.status === 'HOLD' && (
-        <div className="bg-marquee-panel border border-marquee-line rounded-xl p-5">
-          <p className="text-sm text-white/60 mb-4">
-            Hold expires in <span className="text-marquee-gold font-medium">{secondsLeft}s</span>. Verify your phone to continue.
+        <Notice tone="error">
+          <p className="font-semibold mb-1">Seat Hold Expired</p>
+          <p className="text-sm opacity-90">
+            This hold expired before payment completed.{' '}
+            <Link to="/" className="underline font-medium hover:text-error">
+              Return to movies
+            </Link>{' '}
+            to pick a new seat.
           </p>
+        </Notice>
+      )}
+
+      {/* Failed Notice */}
+      {failed && (
+        <Notice tone="error">
+          <p className="font-semibold mb-1">Payment Unsuccessful</p>
+          <p className="text-sm opacity-90">
+            The gateway declined the transaction. The seat was released back to the map.
+          </p>
+        </Notice>
+      )}
+
+      {/* HOLD State Card */}
+      {booking.status === 'HOLD' && (
+        <Card className="p-6 space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-borderLight/60">
+            <span className="text-sm text-textSecondary">Seat Hold Expiry</span>
+            <span className="px-3 py-1 rounded-full text-xs font-mono font-bold bg-primaryLight text-primaryDark animate-pulse">
+              {secondsLeft}s remaining
+            </span>
+          </div>
+
+          <p className="text-sm text-textSecondary">
+            Verify your mobile number via OTP code to proceed to checkout.
+          </p>
+
           {!otpSent ? (
             <button
               onClick={handleSendOtp}
               disabled={busy || secondsLeft === 0}
-              className="px-5 py-2 rounded-md bg-marquee-crimson hover:bg-marquee-crimson/80 disabled:opacity-50 text-sm font-medium"
+              className="w-full py-3 rounded-xl bg-primary hover:bg-primaryDark text-white font-medium text-sm transition-colors shadow-md disabled:opacity-50"
             >
-              {busy ? 'Sending...' : 'Send OTP'}
+              {busy ? 'Sending OTP Code...' : 'Send Verification OTP'}
             </button>
           ) : (
-            <div className="flex gap-2">
-              <input
-                value={otpCode}
-                onChange={(e) => setOtpCode(e.target.value)}
-                placeholder="123456"
-                className="bg-marquee-bg border border-marquee-line rounded-md px-3 py-2 text-sm w-32 outline-none focus:border-marquee-gold"
-              />
-              <button
-                onClick={handleVerifyOtp}
-                disabled={busy || secondsLeft === 0}
-                className="px-4 py-2 rounded-md bg-marquee-gold text-marquee-bg font-medium text-sm disabled:opacity-50"
-              >
-                Verify
-              </button>
-              <button
-                onClick={handleSendOtp}
-                disabled={busy}
-                className="px-3 py-2 rounded-md border border-marquee-line text-sm text-white/60 hover:text-white"
-              >
-                Resend
-              </button>
+            <div className="space-y-3">
+              <div className="flex gap-2">
+                <input
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value)}
+                  placeholder="Enter 123456"
+                  className="bg-surface border border-borderLight rounded-xl px-4 py-2.5 text-sm w-full outline-none focus:border-primary font-mono text-textPrimary"
+                />
+                <button
+                  onClick={handleVerifyOtp}
+                  disabled={busy || secondsLeft === 0}
+                  className="px-6 py-2.5 rounded-xl bg-primary hover:bg-primaryDark text-white font-medium text-sm transition-colors shadow-md disabled:opacity-50 whitespace-nowrap"
+                >
+                  Verify
+                </button>
+              </div>
+
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-textTertiary">Mock code: 123456</span>
+                <button
+                  onClick={handleSendOtp}
+                  disabled={busy}
+                  className="text-primary hover:underline font-medium"
+                >
+                  Resend Code
+                </button>
+              </div>
             </div>
           )}
-        </div>
+        </Card>
       )}
 
+      {/* OTP_VERIFIED State Card */}
       {booking.status === 'OTP_VERIFIED' && (
-        <div className="bg-marquee-panel border border-marquee-line rounded-xl p-5">
-          <p className="text-sm text-white/60 mb-4">Phone verified. Complete payment to confirm your seat.</p>
+        <Card className="p-6 space-y-4">
+          <div className="flex items-center gap-2 text-success font-medium text-sm">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+            </svg>
+            Phone Number Verified
+          </div>
+
+          <p className="text-sm text-textSecondary">
+            Your seat is locked. Click below to initiate payment with the mock gateway.
+          </p>
+
           <button
             onClick={handlePay}
             disabled={paying}
-            className="px-5 py-2 rounded-md bg-marquee-crimson hover:bg-marquee-crimson/80 disabled:opacity-50 text-sm font-medium"
+            className="w-full py-3.5 rounded-xl bg-primary hover:bg-primaryDark text-white font-semibold text-base transition-colors shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            {paying ? 'Submitting...' : `Pay ৳${booking.amount}`}
+            {paying ? 'Processing Payment...' : `Pay ৳${booking.amount}`}
           </button>
-        </div>
+        </Card>
       )}
 
+      {/* PAYMENT_PENDING State */}
       {booking.status === 'PAYMENT_PENDING' && (
-        <div className="bg-marquee-panel border border-marquee-line rounded-xl p-5 flex items-center gap-3">
-          <span className="w-2 h-2 rounded-full bg-marquee-gold animate-pulse" />
-          <p className="text-sm text-white/60">
-            Waiting on the payment gateway. This can take a few seconds — we'll update automatically.
-          </p>
-        </div>
+        <Card className="p-6 flex items-center gap-4 border-primary/40 bg-primaryLight/20">
+          <div className="w-4 h-4 rounded-full bg-primary animate-ping flex-shrink-0" />
+          <div>
+            <p className="font-semibold text-textPrimary text-sm mb-0.5">Awaiting Payment Gateway Confirmation</p>
+            <p className="text-xs text-textSecondary">
+              The gateway is settling the charge asynchronously (2–15s delay). This page will auto-update upon confirmation.
+            </p>
+          </div>
+        </Card>
       )}
 
+      {/* CONFIRMED Ticket Display */}
       {booking.status === 'CONFIRMED' && (
-        <Notice tone="mint">
-          🎟 Booking confirmed! Seat locked in for good. Show this reference at the counter:{' '}
-          <span className="font-mono text-marquee-gold">{bookingRef}</span>
+        <Notice tone="success">
+          <div className="flex items-start gap-3">
+            <div className="p-2 rounded-xl bg-success/20 text-success text-2xl">🎟</div>
+            <div className="space-y-1">
+              <p className="font-bold text-lg text-textPrimary">Ticket Booking Confirmed!</p>
+              <p className="text-sm text-textSecondary">
+                Your seat has been permanently locked. Show reference <strong className="font-mono text-primary">{bookingRef}</strong> at the cinema counter.
+              </p>
+            </div>
+          </div>
         </Notice>
       )}
 
-      {message && <p className="text-sm text-white/50 mt-4">{message}</p>}
+      {message && (
+        <p className="text-xs text-center text-textSecondary font-mono bg-surface p-3 rounded-xl border border-borderLight">
+          {message}
+        </p>
+      )}
     </div>
   );
 }
 
 function Steps({ step }: { step: number }) {
-  const labels = ['Hold', 'Verify', 'Pay', 'Confirmed'];
+  const labels = ['Hold Seat', 'Verify Phone', 'Payment', 'Confirmed'];
   return (
-    <div className="flex items-center gap-2 mb-6 text-xs">
-      {labels.map((l, i) => (
-        <div key={l} className="flex items-center gap-2">
+    <div className="grid grid-cols-4 gap-2 text-center text-xs py-2">
+      {labels.map((l, i) => {
+        const isActive = i === step;
+        const isDone = i < step;
+
+        return (
           <div
-            className={[
-              'w-6 h-6 rounded-full flex items-center justify-center border',
-              i < step
-                ? 'bg-marquee-gold border-marquee-gold text-marquee-bg'
-                : i === step
-                ? 'border-marquee-gold text-marquee-gold'
-                : 'border-white/15 text-white/30',
-            ].join(' ')}
+            key={l}
+            className={`p-2.5 rounded-xl border transition-all ${
+              isDone
+                ? 'bg-successLight border-success/30 text-success font-medium'
+                : isActive
+                ? 'bg-primaryLight border-primary/50 text-primaryDark font-bold shadow-sm'
+                : 'bg-surface border-borderLight text-textTertiary'
+            }`}
           >
-            {i + 1}
+            <div className="font-mono text-[11px] opacity-75 mb-0.5">Step 0{i + 1}</div>
+            <div className="truncate">{l}</div>
           </div>
-          <span className={i <= step ? 'text-white/70' : 'text-white/30'}>{l}</span>
-          {i < labels.length - 1 && <span className="w-6 h-px bg-white/15 mx-1" />}
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
 
-function Notice({ tone, children }: { tone: 'crimson' | 'mint'; children: React.ReactNode }) {
-  const cls =
-    tone === 'crimson'
-      ? 'border-marquee-crimson/40 bg-marquee-crimson/10 text-marquee-crimson'
-      : 'border-marquee-mint/40 bg-marquee-mint/10 text-marquee-mint';
-  return <div className={`border rounded-xl p-4 text-sm mb-4 ${cls}`}>{children}</div>;
+function Notice({ tone, children }: { tone: 'error' | 'success'; children: React.ReactNode }) {
+  const style =
+    tone === 'error'
+      ? 'border-error/40 bg-errorLight text-error'
+      : 'border-success/40 bg-successLight text-textPrimary';
+  return <div className={`border rounded-2xl p-5 ${style}`}>{children}</div>;
 }

@@ -2,31 +2,177 @@
 @tailwind components;
 @tailwind utilities;
 
+/* -------------------------------------------------------------------------- */
+/* ResourceX Design System Color Tokens & CSS Variables                       */
+/* -------------------------------------------------------------------------- */
+
+:root {
+  /* Light Theme (Warm Cream Paper & Terracotta) */
+  --color-primary: 218 119 86;           /* #da7756 */
+  --color-primary-light: 253 240 236;    /* #fdf0ec */
+  --color-primary-dark: 143 60 36;       /* #8f3c24 */
+  --color-accent: 26 24 22;              /* #1a1816 */
+  --color-background: 250 249 247;      /* #faf9f7 */
+  --color-surface: 243 241 236;         /* #f3f1ec */
+  --color-surface-variant: 237 233 225; /* #ede9e1 */
+  --color-card: 255 255 255;            /* #ffffff */
+  --color-text-primary: 26 24 22;       /* #1a1816 */
+  --color-text-secondary: 92 88 81;     /* #5c5851 */
+  --color-text-tertiary: 156 152 144;   /* #9c9890 */
+  --color-border-light: 229 226 219;    /* #e5e2db */
+
+  --color-success: 34 197 94;
+  --color-success-light: 240 253 244;
+  --color-warning: 245 158 11;
+  --color-warning-light: 254 243 199;
+  --color-error: 239 68 68;
+  --color-error-light: 254 242 242;
+}
+
+.dark {
+  /* Dark Theme (Soft Dark Chocolate & Warm Peach) */
+  --color-primary: 232 156 120;          /* #e89c78 */
+  --color-primary-light: 84 57 46;       /* #54392e */
+  --color-primary-dark: 240 196 177;     /* #f0c4b1 */
+  --color-accent: 234 230 225;          /* #eae6e1 */
+  --color-background: 42 39 36;         /* #2a2724 */
+  --color-surface: 51 47 44;            /* #332f2c */
+  --color-surface-variant: 61 56 52;    /* #3d3834 */
+  --color-card: 51 47 44;               /* #332f2c */
+  --color-text-primary: 234 230 225;    /* #eae6e1 */
+  --color-text-secondary: 184 179 173;  /* #b8b3ad */
+  --color-text-tertiary: 138 133 126;   /* #8a857e */
+  --color-border-light: 61 56 52;       /* #3d3834 */
+
+  --color-success: 74 222 128;
+  --color-success-light: 20 83 45;
+  --color-warning: 251 191 36;
+  --color-warning-light: 120 53 15;
+  --color-error: 248 113 113;
+  --color-error-light: 127 29 29;
+}
+
 html, body, #root {
   height: 100%;
 }
 
 body {
   font-family: 'Inter', sans-serif;
-  background:
-    radial-gradient(1200px 600px at 10% -10%, rgba(200, 56, 74, 0.12), transparent),
-    radial-gradient(1000px 500px at 100% 0%, rgba(232, 182, 76, 0.08), transparent),
-    #0b0b12;
+  background-color: rgb(var(--color-background));
+  color: rgb(var(--color-text-primary));
   min-height: 100vh;
+  transition: background-color 250ms ease, color 250ms ease;
 }
 
-.font-display {
-  letter-spacing: 0.03em;
+/* -------------------------------------------------------------------------- */
+/* Graphic Styles & Micro-Animations                                          */
+/* -------------------------------------------------------------------------- */
+
+/* Graph-Paper Background */
+.graph-grid {
+  background-image:
+    linear-gradient(to right, rgba(0, 0, 0, 0.04) 0.5px, transparent 0.5px),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.04) 0.5px, transparent 0.5px);
+  background-size: 32px 32px;
+}
+.dark .graph-grid {
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.035) 0.5px, transparent 0.5px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 0.5px, transparent 0.5px);
 }
 
+/* Glassmorphism Panel Style */
+.glass-panel {
+  background-color: rgb(var(--color-card) / 0.75);
+  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  border: 1px solid rgb(var(--color-border-light) / 0.8);
+  box-shadow:
+    inset 0 1px 0 0 rgb(255 255 255 / 0.5),
+    0 12px 34px -12px rgb(0 0 0 / 0.12),
+    0 4px 12px -4px rgb(0 0 0 / 0.06);
+}
+.dark .glass-panel {
+  background-color: rgb(var(--color-card) / 0.65);
+  border-color: rgb(var(--color-border-light) / 0.9);
+  box-shadow:
+    inset 0 1px 0 0 rgb(255 255 255 / 0.06),
+    0 18px 44px -14px rgb(0 0 0 / 0.45),
+    0 6px 16px -6px rgb(0 0 0 / 0.3);
+}
+
+/* CSS Hover Lift (.rx-lift) */
+.rx-lift {
+  transform: translate3d(0, 0, 0);
+  transition: transform 300ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 300ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.rx-lift:hover {
+  transform: translate3d(0, -4px, 0);
+  box-shadow:
+    0 12px 28px -12px rgb(var(--color-primary) / 0.28),
+    0 6px 14px -8px rgb(17 24 39 / 0.18);
+}
+@media (prefers-reduced-motion: reduce) {
+  .rx-lift {
+    transition: none !important;
+  }
+  .rx-lift:hover {
+    transform: none !important;
+  }
+}
+
+/* Ambient Glow Blobs Keyframes */
+@keyframes rxDrift {
+  0%, 100% { transform: translate(0px, 0px) scale(1); }
+  50% { transform: translate(30px, -20px) scale(1.08); }
+}
+@keyframes rxWarm {
+  0%, 100% { transform: translate(0px, 0px) scale(1); }
+  50% { transform: translate(-25px, 25px) scale(1.05); }
+}
+@keyframes rxBreath {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.1); }
+}
+
+.rx-blob-1 {
+  animation: rxDrift 18s ease-in-out infinite;
+}
+.rx-blob-2 {
+  animation: rxWarm 22s ease-in-out infinite;
+}
+.rx-blob-3 {
+  animation: rxBreath 15s ease-in-out infinite;
+}
+
+/* Seat Map Custom Interactive Styles */
 .seat {
-  transition: transform 120ms ease, box-shadow 120ms ease;
+  transition: transform 150ms ease, box-shadow 150ms ease, background-color 150ms ease, border-color 150ms ease;
 }
 .seat:hover:not(.seat-disabled) {
-  transform: translateY(-2px);
+  transform: scale(1.15) translateY(-2px);
+  box-shadow: 0 4px 12px -2px rgb(var(--color-primary) / 0.35);
 }
 
 ::selection {
-  background: #c8384a;
-  color: white;
+  background: rgb(var(--color-primary));
+  color: #ffffff;
+}
+
+
+/* Seat Variants */
+.seat-standard {
+  @apply bg-surface border-borderLight hover:border-primary text-textPrimary;
+}
+.seat-recliner {
+  @apply bg-primaryLight border-primary/40 text-primaryDark hover:border-primary;
+}
+.seat-premium {
+  @apply bg-successLight border-success/30 text-success hover:border-success;
+}
+.seat-booked {
+  @apply bg-error border-error text-white opacity-80 cursor-not-allowed;
+}
+.seat-selected {
+  @apply bg-primary border-primary text-white font-bold shadow-md shadow-primary/30;
 }
