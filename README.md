@@ -56,13 +56,22 @@ The stack automatically handles:
 
 If you wish to run the backend and frontend services locally on your host machine during development:
 
-1. **Start the Database, Redis, and Mock Gateway dependencies**:
+1. **Start Database and Redis**:
    ```bash
-   # Spin up database, redis, and mock payment gateway only
-   docker compose up postgres redis mock-gateway -d
+   # Spin up database and redis dependencies
+   docker compose up postgres redis -d
+   ```
+   *(Note: Ensure Docker is running to launch Postgres and Redis)*
+
+2. **Run Mock Gateway Service (Required for OTP & Payments)**:
+   ```bash
+   cd gateway
+   npm install
+   # Start the mock gateway on port 9000
+   npm run dev
    ```
 
-2. **Run Backend API Server**:
+3. **Run Backend API Server**:
    ```bash
    cd backend
    npm install
@@ -73,7 +82,7 @@ If you wish to run the backend and frontend services locally on your host machin
    ```
    The backend will be running on `http://localhost:4000`.
 
-3. **Run Frontend App**:
+4. **Run Frontend App**:
    ```bash
    cd frontend
    npm install
