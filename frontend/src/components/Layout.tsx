@@ -247,16 +247,6 @@ export function Layout() {
       <footer className="border-t border-borderLight/60 py-8 text-center text-xs text-textTertiary relative z-10 bg-surface/30 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-5 flex flex-col sm:flex-row justify-between items-center gap-3">
           <p>© {new Date().getFullYear()} CinemaSeat — Built with ResourceX Design System</p>
-          <div className="flex items-center gap-4 text-textSecondary">
-            <span className="inline-flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
-              Backend: 4000
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-              Gateway: 9000
-            </span>
-          </div>
         </div>
       </footer>
     </div>
