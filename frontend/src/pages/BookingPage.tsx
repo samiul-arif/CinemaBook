@@ -25,8 +25,15 @@ export function BookingPage() {
   const [copied, setCopied] = useState(false);
   const [ticket, setTicket] = useState<DetailedTicket | null>(null);
   const [generatingTicket, setGeneratingTicket] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   const secondsLeft = useCountdown(booking?.hold_expires_at ?? null);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const id = setInterval(() => setResendCooldown((c) => c - 1), 1000);
+    return () => clearInterval(id);
+  }, [resendCooldown]);
 
   useEffect(() => {
     if (!bookingRef) return;
@@ -43,6 +50,7 @@ export function BookingPage() {
     if (booking?.status === 'HOLD' && !otpSent) {
       setOtpSent(true);
       setMessage('OTP sent to your registered phone number.');
+      setResendCooldown(30);
     }
   }, [booking?.status]);
 
@@ -68,12 +76,13 @@ export function BookingPage() {
   const failed = booking.status === 'FAILED';
 
   async function handleSendOtp() {
-    if (!bookingRef) return;
+    if (!bookingRef || resendCooldown > 0) return;
     setBusy(true);
     setMessage(null);
     try {
       const res = await api.sendOtp(bookingRef);
       setOtpSent(true);
+      setResendCooldown(30);
       if (res.code) {
         setMessage(`Verification code sent. Code: ${res.code}`);
       } else {
@@ -244,10 +253,10 @@ export function BookingPage() {
               <span className="text-textTertiary">Mock OTP code: <span className="font-mono font-bold">{booking.otp_code || 'Sent to phone'}</span></span>
               <button
                 onClick={handleSendOtp}
-                disabled={busy}
-                className="text-primary hover:underline font-medium"
+                disabled={busy || resendCooldown > 0}
+                className="text-primary hover:underline font-medium disabled:opacity-50 disabled:no-underline"
               >
-                Resend Code
+                {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend Code'}
               </button>
             </div>
           </div>
