@@ -1,4 +1,5 @@
 import { releaseExpiredHolds, invalidateSeatMapCache } from '../services/seatService';
+import { releaseSeatLock, logLockExpired } from '../services/redisLockService';
 import { pool } from '../db/pool';
 import { env } from '../config/env';
 import { logger } from '../utils/logger';
@@ -14,6 +15,10 @@ async function sweepOnce(): Promise<number> {
   for (const r of released) {
     showtimeIds.add(r.showtimeId);
     if (r.bookingRef) {
+      // Release Redis lock and log LOCK_EXPIRED
+      await releaseSeatLock(r.showtimeId, r.seatId, r.bookingRef);
+      logLockExpired(r.showtimeId, r.seatId, r.bookingRef);
+
       // Only expire bookings still sitting in HOLD - a booking that already
       // progressed to CONFIRMED/FAILED/PAYMENT_PENDING must not be touched
       // even if its original hold_expires_at has passed.

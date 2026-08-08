@@ -26,7 +26,9 @@ graph TD
 
 ### Micro-Architecture & Data Flow
 1. **Seat Map Query (`GET /api/showtimes/:id/seats`)**: Hits a short-lived Redis cache (`SEAT_MAP_CACHE_TTL_SECONDS`). Fallback to Postgres if Redis is unreachable.
-2. **Atomic Seat Hold (`POST /api/showtimes/:id/seats/:seatId/hold`)**: Issues a single atomic SQL statement `UPDATE seats SET status = 'HELD'... WHERE (status = 'AVAILABLE' OR (status = 'HELD' AND hold_expires_at < now()))`. Postgres row-level locks serialize incoming parallel requests and prevent race conditions.
+2. **Atomic Seat Hold (`POST /api/showtimes/:id/seats/:seatId/hold`)**:
+   - **Redis Fast Concurrency Gate**: Attempts an atomic lock `SET seat:lock:{showtimeId}:{seatId} {bookingRef} NX EX {HOLD_TTL_SECONDS}`. Rejects concurrent losers immediately with HTTP 409 (`LOCK_REJECTED`), shedding database load.
+   - **PostgreSQL Final Source of Truth**: Winner executes single atomic SQL `UPDATE seats SET status = 'HELD'... WHERE (status = 'AVAILABLE' OR (status = 'HELD' AND hold_expires_at < now()))`. If DB hold creation fails, Redis lock is immediately released. If Redis is unavailable, system gracefully falls back to Postgres atomic locking.
 3. **Async Payments (`POST /api/bookings/:ref/pay`)**: Returns HTTP `202 PENDING` instantly. Payment completion is handled asynchronously by gateway webhooks.
 4. **Idempotent Webhooks (`POST /api/payments/callback`)**: Webhook events hit a `payment_events` table with `event_id` as PRIMARY KEY. Duplicate callbacks hit `ON CONFLICT DO NOTHING` and return HTTP `200` without double-booking or double-counting revenue.
 

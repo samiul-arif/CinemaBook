@@ -1,6 +1,7 @@
 import { PoolClient } from 'pg';
 import { pool, withTransaction } from '../db/pool';
 import { redis, safeDel, safeGet, safeSetEx } from '../redis/client';
+import { acquireSeatLock, releaseSeatLock, logLockExpired } from './redisLockService';
 import { holdTtlSeconds, env } from '../config/env';
 import { ApiError } from '../middleware/errorHandler';
 import { logger } from '../utils/logger';
@@ -57,19 +58,16 @@ export async function invalidateSeatMapCache(showtimeId: string): Promise<void> 
 /**
  * Attempt to place a hold on one seat for one showtime.
  *
- * Concurrency strategy (this is the answer to "100 requests, 1 winner"):
- *   A single UPDATE ... WHERE status = 'AVAILABLE' (or an expired HELD row)
- *   is issued inside a transaction. Postgres takes a row-level lock on the
- *   target row for the duration of the UPDATE, so concurrent transactions
- *   attempting to update the *same* row are serialized by the database
- *   itself - there is no read-modify-write window in application code for
- *   a race to slip through. Exactly one UPDATE can match `status =
- *   'AVAILABLE'` and flip it to 'HELD'; every other concurrent UPDATE sees
- *   0 rows affected once the winner commits, and gets rejected.
+ * Architecture Strategy:
+ * 1. Redis First (Fast Concurrency Gate):
+ *    Attempts to acquire an atomic Redis lock (`SET seat:lock:{showtimeId}:{seatId} {bookingRef} NX EX {ttl}`).
+ *    If lock acquisition fails (seat is locked by another request), immediately returns HTTP 409
+ *    WITHOUT reaching PostgreSQL.
  *
- *   We do not use a separate `SELECT ... FOR UPDATE` followed by an
- *   `UPDATE`, because that is strictly more code for the same guarantee -
- *   the single conditional UPDATE *is* the row lock.
+ * 2. PostgreSQL Final Authority (Source of Truth):
+ *    If Redis lock is acquired (or if Redis is offline/degraded), executes a single atomic UPDATE
+ *    WHERE status = 'AVAILABLE' (or expired HELD). If PostgreSQL hold creation fails for any reason
+ *    (e.g., seat already held/booked in DB), the Redis lock is immediately released.
  */
 export async function holdSeat(params: {
   showtimeId: string;
@@ -81,49 +79,65 @@ export async function holdSeat(params: {
   const { showtimeId, seatId, phone, bookingRef, userId } = params;
   const ttl = holdTtlSeconds();
 
-  const result = await withTransaction(async (client: PoolClient) => {
-    const holdExpiresAt = new Date(Date.now() + ttl * 1000);
+  // 1. Acquire Redis lock as fast concurrency gate
+  const lockAcquired = await acquireSeatLock(showtimeId, seatId, bookingRef, ttl);
+  if (!lockAcquired) {
+    throw new ApiError(409, 'SEAT_UNAVAILABLE', 'Seat is currently being reserved by another user');
+  }
 
-    const updateResult = await client.query<Seat>(
-      `UPDATE seats
-       SET status = 'HELD',
-           hold_expires_at = $1,
-           held_by_booking_ref = $2,
-           version = version + 1
-       WHERE id = $3
-         AND showtime_id = $4
-         AND (
-               status = 'AVAILABLE'
-            OR (status = 'HELD' AND hold_expires_at < now())
-         )
-       RETURNING *`,
-      [holdExpiresAt.toISOString(), bookingRef, seatId, showtimeId]
-    );
+  let result: { seat: Seat; booking: any; holdExpiresAt: Date };
 
-    if (updateResult.rowCount === 0) {
-      // Either the seat does not exist, or (far more likely under load)
-      // someone else's UPDATE already won the race and committed first.
-      const existing = await client.query<Seat>(
-        `SELECT * FROM seats WHERE id = $1 AND showtime_id = $2`,
-        [seatId, showtimeId]
+  try {
+    // 2. PostgreSQL transaction for final correctness guarantee
+    result = await withTransaction(async (client: PoolClient) => {
+      const holdExpiresAt = new Date(Date.now() + ttl * 1000);
+
+      const updateResult = await client.query<Seat>(
+        `UPDATE seats
+         SET status = 'HELD',
+             hold_expires_at = $1,
+             held_by_booking_ref = $2,
+             version = version + 1
+         WHERE id = $3
+           AND showtime_id = $4
+           AND (
+                 status = 'AVAILABLE'
+              OR (status = 'HELD' AND hold_expires_at < now())
+           )
+         RETURNING *`,
+        [holdExpiresAt.toISOString(), bookingRef, seatId, showtimeId]
       );
-      if (existing.rowCount === 0) {
-        throw new ApiError(404, 'SEAT_NOT_FOUND', 'Seat does not exist for this showtime');
+
+      if (updateResult.rowCount === 0) {
+        // Either the seat does not exist, or (far more likely under load)
+        // someone else's UPDATE already won the race and committed first.
+        const existing = await client.query<Seat>(
+          `SELECT * FROM seats WHERE id = $1 AND showtime_id = $2`,
+          [seatId, showtimeId]
+        );
+        if (existing.rowCount === 0) {
+          throw new ApiError(404, 'SEAT_NOT_FOUND', 'Seat does not exist for this showtime');
+        }
+        throw new ApiError(409, 'SEAT_UNAVAILABLE', 'Seat is already held or booked');
       }
-      throw new ApiError(409, 'SEAT_UNAVAILABLE', 'Seat is already held or booked');
-    }
 
-    const seat = updateResult.rows[0];
+      const seat = updateResult.rows[0];
 
-    const bookingInsert = await client.query(
-      `INSERT INTO bookings (booking_ref, showtime_id, seat_id, phone, user_id, amount, hold_expires_at, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'HOLD')
-       RETURNING *`,
-      [bookingRef, showtimeId, seatId, phone, userId ?? null, seat.price, holdExpiresAt.toISOString()]
-    );
+      const bookingInsert = await client.query(
+        `INSERT INTO bookings (booking_ref, showtime_id, seat_id, phone, user_id, amount, hold_expires_at, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'HOLD')
+         RETURNING *`,
+        [bookingRef, showtimeId, seatId, phone, userId ?? null, seat.price, holdExpiresAt.toISOString()]
+      );
 
-    return { seat, booking: bookingInsert.rows[0], holdExpiresAt };
-  });
+      return { seat, booking: bookingInsert.rows[0], holdExpiresAt };
+    });
+  } catch (err) {
+    // Failure safety: If PostgreSQL hold creation fails after Redis lock succeeded,
+    // immediately release the Redis lock before propagating the error.
+    await releaseSeatLock(showtimeId, seatId, bookingRef);
+    throw err;
+  }
 
   await invalidateSeatMapCache(showtimeId);
   logger.info('seat held', { showtimeId, seatId, bookingRef });
@@ -135,14 +149,20 @@ export async function holdSeat(params: {
 export async function releaseSeatForBooking(
   client: PoolClient,
   seatId: string,
-  bookingRef: string
+  bookingRef: string,
+  showtimeId?: string
 ): Promise<void> {
-  await client.query(
+  const res = await client.query(
     `UPDATE seats
      SET status = 'AVAILABLE', hold_expires_at = NULL, held_by_booking_ref = NULL, version = version + 1
-     WHERE id = $1 AND held_by_booking_ref = $2 AND status = 'HELD'`,
+     WHERE id = $1 AND held_by_booking_ref = $2 AND status = 'HELD'
+     RETURNING showtime_id`,
     [seatId, bookingRef]
   );
+  const targetShowtimeId = showtimeId ?? res.rows[0]?.showtime_id;
+  if (targetShowtimeId) {
+    await releaseSeatLock(targetShowtimeId, seatId, bookingRef);
+  }
 }
 
 /** Confirm a seat as booked (payment succeeded). Only transitions if currently held by this booking. */
@@ -187,6 +207,13 @@ export async function releaseExpiredHolds(): Promise<
      WHERE s.id = e.id
      RETURNING s.id AS "seatId", e.showtime_id AS "showtimeId", e.held_by_booking_ref AS "bookingRef"`
   );
+
+  for (const r of rows) {
+    if (r.bookingRef) {
+      await releaseSeatLock(r.showtimeId, r.seatId, r.bookingRef);
+      logLockExpired(r.showtimeId, r.seatId, r.bookingRef);
+    }
+  }
 
   return rows;
 }

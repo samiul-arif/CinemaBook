@@ -9,6 +9,7 @@ import * as path from 'path';
 import { pool } from '../src/db/pool';
 import { redis } from '../src/redis/client';
 import { holdSeat, releaseExpiredHolds } from '../src/services/seatService';
+import { isSeatLocked, seatLockKey } from '../src/services/redisLockService';
 import { newBookingRef } from '../src/utils/ids';
 import { verifyOtp } from '../src/services/otpService';
 import { initiatePayment } from '../src/services/paymentService';
@@ -66,7 +67,7 @@ afterAll(async () => {
   await redis.quit();
 });
 
-test('100 concurrent holds on the same seat: exactly 1 success, 0 oversell', async () => {
+test('100 concurrent holds on the same seat: exactly 1 success, 0 oversell, 1 Redis lock acquired', async () => {
   const attempts = Array.from({ length: 100 }, (_, i) =>
     holdSeat({
       showtimeId,
@@ -74,7 +75,7 @@ test('100 concurrent holds on the same seat: exactly 1 success, 0 oversell', asy
       phone: `+8801700000${String(i).padStart(3, '0')}`,
       bookingRef: newBookingRef(),
     })
-      .then(() => ({ ok: true as const }))
+      .then((res) => ({ ok: true as const, res }))
       .catch((err) => ({ ok: false as const, status: err.status }))
   );
 
@@ -86,8 +87,20 @@ test('100 concurrent holds on the same seat: exactly 1 success, 0 oversell', asy
   expect(rejections.length).toBe(99);
   expect(rejections.every((r: any) => r.status === 409)).toBe(true);
 
+  // Assert Redis lock key exists and is locked by the winning bookingRef
+  const locked = await isSeatLocked(showtimeId, seatId);
+  expect(locked).toBe(true);
+
+  const lockVal = await redis.get(seatLockKey(showtimeId, seatId));
+  const winningRef = (successes[0] as any).res.seat.held_by_booking_ref;
+  expect(lockVal).toBe(winningRef);
+
+  // Assert database state: exactly 1 seat held in PostgreSQL (0 oversell)
   const seatRow = await pool.query(`SELECT status FROM seats WHERE id = $1`, [seatId]);
   expect(seatRow.rows[0].status).toBe('HELD');
+
+  const bookingRows = await pool.query(`SELECT COUNT(*) FROM bookings WHERE seat_id = $1`, [seatId]);
+  expect(parseInt(bookingRows.rows[0].count, 10)).toBe(1);
 });
 
 test('hold expiry sweep releases an abandoned hold back to AVAILABLE', async () => {
@@ -220,3 +233,37 @@ test('expired hold cannot initiate payment', async () => {
 
   await expect(initiatePayment(ref)).rejects.toThrow();
 });
+
+test('Redis unavailable: system gracefully falls back to existing PostgreSQL concurrency logic', async () => {
+  const seat = await pool.query(
+    `INSERT INTO seats (showtime_id, seat_row, seat_col, seat_label, price)
+     VALUES ($1, 'F', 18, 'F18', 400) RETURNING id`,
+    [showtimeId]
+  );
+  const fallbackSeatId = seat.rows[0].id;
+  const ref = newBookingRef();
+
+  // Mock redis.set to simulate a Redis failure/error
+  const setSpy = jest.spyOn(redis, 'set').mockRejectedValueOnce(new Error('Redis connection lost'));
+
+  try {
+    const res = await holdSeat({
+      showtimeId,
+      seatId: fallbackSeatId,
+      phone: '+8801799999999',
+      bookingRef: ref,
+    });
+
+    expect(res.seat.id).toBe(fallbackSeatId);
+
+    // Verify PostgreSQL database successfully completed hold state transition
+    const seatRow = await pool.query(`SELECT status, held_by_booking_ref FROM seats WHERE id = $1`, [
+      fallbackSeatId,
+    ]);
+    expect(seatRow.rows[0].status).toBe('HELD');
+    expect(seatRow.rows[0].held_by_booking_ref).toBe(ref);
+  } finally {
+    setSpy.mockRestore();
+  }
+});
+
