@@ -16,11 +16,16 @@ import { ProfilePage } from './pages/ProfilePage';
 import { MyBookingsPage } from './pages/MyBookingsPage';
 import { MyTicketsPage } from './pages/MyTicketsPage';
 
+const getBasename = () => {
+  const match = typeof window !== 'undefined' ? window.location.pathname.match(/^\/proxy\/\d+/) : null;
+  return match ? match[0] : '';
+};
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ThemeProvider>
       <AuthProvider>
-        <BrowserRouter>
+        <BrowserRouter basename={getBasename()}>
           <Routes>
             <Route element={<Layout />}>
               {/* Public Routes */}
