@@ -17,16 +17,15 @@ export async function rateLimiter(req: Request, res: Response, next: NextFunctio
 
   try {
     if (redis.status === 'ready') {
-      const current = await redis.get(key);
-      if (current && parseInt(current, 10) >= limit) {
+      const current = await redis.incr(key);
+      if (current === 1) {
+        await redis.expire(key, windowSeconds);
+      }
+
+      if (current > limit) {
         logger.warn('rate limit exceeded', { ip, key, requestId: req.requestId });
         return next(new ApiError(429, 'RATE_LIMIT_EXCEEDED', 'Too many hold requests. Limit is 5 requests per second.'));
       }
-
-      await redis.multi()
-        .incr(key)
-        .expire(key, windowSeconds)
-        .exec();
     } else {
       // In-memory fallback
       const cached = memoryCache.get(ip);

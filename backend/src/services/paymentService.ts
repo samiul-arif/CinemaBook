@@ -1,6 +1,6 @@
 import { PoolClient } from 'pg';
 import { pool, withTransaction } from '../db/pool';
-import { env } from '../config/env';
+import { env, holdTtlSeconds } from '../config/env';
 import { chargeViaGateway, MockForce, MockMode } from '../gateway/gatewayClient';
 import { getBookingByRef, assertHoldActive } from './bookingService';
 import { markSeatBooked, releaseSeatForBooking, invalidateSeatMapCache } from './seatService';
@@ -22,33 +22,71 @@ export async function initiatePayment(
   bookingRef: string,
   opts?: { mode?: MockMode; force?: MockForce }
 ): Promise<{ paymentId: string; status: string }> {
-  const booking = await getBookingByRef(bookingRef);
-  assertHoldActive(booking);
+  const result = await withTransaction(async (client) => {
+    // 1. Get booking and check if active
+    const bookingRes = await client.query(
+      `SELECT * FROM bookings WHERE booking_ref = $1 FOR UPDATE`,
+      [bookingRef]
+    );
+    if (bookingRes.rowCount === 0) {
+      throw new ApiError(404, 'BOOKING_NOT_FOUND', 'No booking with that reference');
+    }
+    const booking = bookingRes.rows[0];
+    assertHoldActive(booking);
 
-  if (booking.status !== 'OTP_VERIFIED' && booking.status !== 'PAYMENT_PENDING') {
-    throw new ApiError(409, 'INVALID_STATE', `Cannot initiate payment from status ${booking.status}`);
+    if (booking.status !== 'OTP_VERIFIED' && booking.status !== 'PAYMENT_PENDING') {
+      throw new ApiError(409, 'INVALID_STATE', `Cannot initiate payment from status ${booking.status}`);
+    }
+
+    // 2. One active (INITIATING/PENDING) payment attempt per booking, enforced by
+    // a partial unique index - guards against a double-click on "Pay" firing
+    // two charges.
+    const existingActive = await client.query(
+      `SELECT * FROM payments WHERE booking_id = $1 AND status IN ('INITIATING', 'PENDING') FOR UPDATE`,
+      [booking.id]
+    );
+    if (existingActive.rowCount && existingActive.rowCount > 0) {
+      const p = existingActive.rows[0];
+      return { paymentId: p.payment_id ?? 'pending', status: p.status, booking, existing: true };
+    }
+
+    // 3. Refresh hold_expires_at
+    const ttl = holdTtlSeconds();
+    const holdExpiresAt = new Date(Date.now() + ttl * 1000);
+
+    const seatUpdate = await client.query(
+      `UPDATE seats
+       SET hold_expires_at = $1, version = version + 1
+       WHERE held_by_booking_ref = $2
+         AND status = 'HELD'
+         AND hold_expires_at >= now()
+       RETURNING id`,
+      [holdExpiresAt.toISOString(), bookingRef]
+    );
+
+    if (seatUpdate.rowCount === 0) {
+      throw new ApiError(410, 'HOLD_EXPIRED', 'This seat hold has expired. Please select a seat again.');
+    }
+
+    await client.query(
+      `INSERT INTO payments (booking_id, amount, currency, status) VALUES ($1, $2, $3, 'INITIATING')`,
+      [booking.id, booking.amount, booking.currency]
+    );
+
+    await client.query(
+      `UPDATE bookings SET status = 'PAYMENT_PENDING', hold_expires_at = $1, updated_at = now() WHERE booking_ref = $2`,
+      [holdExpiresAt.toISOString(), bookingRef]
+    );
+
+    return { paymentId: 'pending', status: 'INITIATING', booking, existing: false };
+  });
+
+  if (result.existing) {
+    return { paymentId: result.paymentId, status: result.status };
   }
 
-  // One active (INITIATING/PENDING) payment attempt per booking, enforced by
-  // a partial unique index - guards against a double-click on "Pay" firing
-  // two charges.
-  const existingActive = await pool.query(
-    `SELECT * FROM payments WHERE booking_id = $1 AND status IN ('INITIATING', 'PENDING')`,
-    [booking.id]
-  );
-  if (existingActive.rowCount && existingActive.rowCount > 0) {
-    const p = existingActive.rows[0];
-    return { paymentId: p.payment_id ?? 'pending', status: p.status };
-  }
-
-  await pool.query(
-    `INSERT INTO payments (booking_id, amount, currency, status) VALUES ($1, $2, $3, 'INITIATING')`,
-    [booking.id, booking.amount, booking.currency]
-  );
-  await pool.query(
-    `UPDATE bookings SET status = 'PAYMENT_PENDING', updated_at = now() WHERE booking_ref = $1`,
-    [bookingRef]
-  );
+  const { booking } = result;
+  await invalidateSeatMapCache(booking.showtime_id);
 
   const callbackUrl = `${env.PUBLIC_BASE_URL}/api/payments/callback`;
 

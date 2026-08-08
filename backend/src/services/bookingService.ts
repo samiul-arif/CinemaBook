@@ -35,7 +35,10 @@ export function assertHoldActive(booking: Booking) {
   if (booking.status === 'EXPIRED') {
     throw new ApiError(410, 'HOLD_EXPIRED', 'This seat hold has expired. Please select a seat again.');
   }
-  if (new Date(booking.hold_expires_at).getTime() < Date.now() && booking.status === 'HOLD') {
+  if (
+    ['HOLD', 'OTP_VERIFIED', 'PAYMENT_PENDING'].includes(booking.status) &&
+    new Date(booking.hold_expires_at).getTime() < Date.now()
+  ) {
     throw new ApiError(410, 'HOLD_EXPIRED', 'This seat hold has expired. Please select a seat again.');
   }
 }
