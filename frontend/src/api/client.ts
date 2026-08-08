@@ -1,4 +1,8 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000';
+const getBasename = () => {
+  const match = typeof window !== 'undefined' ? window.location.pathname.match(/^\/proxy\/\d+/) : null;
+  return match ? match[0] : '';
+};
+const API_BASE = import.meta.env.VITE_API_BASE_URL || getBasename();
 
 export class ApiRequestError extends Error {
   status: number;

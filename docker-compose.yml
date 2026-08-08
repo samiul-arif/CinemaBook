@@ -12,7 +12,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U cinemaseat -d cinemaseat"]
+      test: [ "CMD-SHELL", "pg_isready -U cinemaseat -d cinemaseat" ]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -22,19 +22,20 @@ services:
     ports:
       - "6379:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 5s
       timeout: 3s
       retries: 10
 
   gateway:
-    image: asifmahmoud414/mock-gateway:latest
+    build:
+      context: ./gateway
     environment:
       PORT: 9000
     ports:
       - "9000:9000"
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:9000/health', r => process.exit(r.statusCode===200?0:1)).on('error', () => process.exit(1))"]
+      test: [ "CMD", "node", "-e", "require('http').get('http://localhost:9000/health', r => process.exit(r.statusCode===200?0:1)).on('error', () => process.exit(1))" ]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -69,7 +70,7 @@ services:
     # and reinserts its own rows.
     command: sh -c "node dist/db/migrate.js && node dist/db/seed.js && node dist/server.js"
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/health', r => process.exit(r.statusCode===200?0:1)).on('error', () => process.exit(1))"]
+      test: [ "CMD", "node", "-e", "require('http').get('http://localhost:4000/health', r => process.exit(r.statusCode===200?0:1)).on('error', () => process.exit(1))" ]
       interval: 10s
       timeout: 3s
       start_period: 15s
@@ -79,7 +80,7 @@ services:
     build:
       context: ./frontend
       args:
-        VITE_API_BASE_URL: http://localhost:4000
+        VITE_API_BASE_URL: ""
     depends_on:
       backend:
         condition: service_healthy
