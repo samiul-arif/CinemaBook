@@ -26,6 +26,7 @@ export function BookingPage() {
   const [ticket, setTicket] = useState<DetailedTicket | null>(null);
   const [generatingTicket, setGeneratingTicket] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const secondsLeft = useCountdown(booking?.hold_expires_at ?? null);
 
@@ -37,7 +38,15 @@ export function BookingPage() {
 
   useEffect(() => {
     if (!bookingRef) return;
-    const load = () => api.getBooking(bookingRef).then(setBooking).catch(() => {});
+    const load = () =>
+      api.getBooking(bookingRef)
+        .then((data) => {
+          setBooking(data);
+          setLoadError(null);
+        })
+        .catch((e) => {
+          setLoadError(e.message || 'Failed to load booking');
+        });
     load();
     const id = setInterval(load, 2500);
     return () => clearInterval(id);
@@ -62,6 +71,20 @@ export function BookingPage() {
     if (booking.status === 'HOLD') return 1;
     return -1; // EXPIRED / FAILED
   }, [booking]);
+
+  if (loadError) {
+    return (
+      <div className="max-w-lg mx-auto p-8 bg-surfaceVariant rounded-2xl text-center space-y-4">
+        <h2 className="text-xl font-bold text-error">Booking Not Found</h2>
+        <p className="text-sm text-textSecondary">
+          This booking reference may have expired or been cleared after the database was restarted.
+        </p>
+        <Link to="/" className="inline-block px-6 py-2.5 rounded-xl bg-primary hover:bg-primaryDark text-white text-sm font-medium transition-colors">
+          Back to Home
+        </Link>
+      </div>
+    );
+  }
 
   if (!booking) {
     return (
