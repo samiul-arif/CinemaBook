@@ -77,7 +77,7 @@ export function BookingPage() {
       <div className="max-w-lg mx-auto p-8 bg-surfaceVariant rounded-2xl text-center space-y-4">
         <h2 className="text-xl font-bold text-error">Booking Not Found</h2>
         <p className="text-sm text-textSecondary">
-          This booking reference may have expired or been cleared after the database was restarted.
+          This booking reference may have expired.
         </p>
         <Link to="/" className="inline-block px-6 py-2.5 rounded-xl bg-primary hover:bg-primaryDark text-white text-sm font-medium transition-colors">
           Back to Home
@@ -316,9 +316,6 @@ export function BookingPage() {
           <div className="w-4 h-4 rounded-full bg-primary animate-ping flex-shrink-0" />
           <div>
             <p className="font-semibold text-textPrimary text-sm mb-0.5">Awaiting Payment Gateway Confirmation</p>
-            <p className="text-xs text-textSecondary">
-              The gateway is settling the charge asynchronously (2–15s delay). This page will auto-update upon confirmation.
-            </p>
           </div>
         </Card>
       )}
