@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { HashRouter, Routes, Route } from 'react-router-dom';
 import './index.css';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
@@ -16,16 +16,11 @@ import { ProfilePage } from './pages/ProfilePage';
 import { MyBookingsPage } from './pages/MyBookingsPage';
 import { MyTicketsPage } from './pages/MyTicketsPage';
 
-const getBasename = () => {
-  const match = typeof window !== 'undefined' ? window.location.pathname.match(/^\/proxy\/\d+/) : null;
-  return match ? match[0] : '';
-};
-
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ThemeProvider>
       <AuthProvider>
-        <BrowserRouter basename={getBasename()}>
+        <HashRouter>
           <Routes>
             <Route element={<Layout />}>
               {/* Public Routes */}
@@ -44,7 +39,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
               </Route>
             </Route>
           </Routes>
-        </BrowserRouter>
+        </HashRouter>
       </AuthProvider>
     </ThemeProvider>
   </React.StrictMode>
