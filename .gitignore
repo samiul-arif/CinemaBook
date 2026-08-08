@@ -12,3 +12,16 @@ yarn-error.log*
 *.log
 .puku/
 rules/
+
+# Credentials, secrets, and environment files
+.env
+.env.local
+.env.*.local
+.deploy.env
+*.pem
+*.key
+credentials/
+secrets/
+**/*.pem
+**/*.key
+**/*.keystore
