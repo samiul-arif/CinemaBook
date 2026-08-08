@@ -10,7 +10,5 @@ yarn-error.log*
 .idea/
 .vscode/
 *.log
-CinemaSeat_Problem_Statement.md
-CinemaSeat_Problem_Statement.pdf
-problem.md
 .puku/
+rules/
