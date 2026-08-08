@@ -6,13 +6,15 @@ import { Seat as SeatComponent, SeatLegend, SeatVariant } from '../components/ui
 
 const ROW_ORDER = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
 
+import { useAuth } from '../context/AuthContext';
+
 export function SeatMapPage() {
   const { showtimeId } = useParams<{ showtimeId: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [seats, setSeats] = useState<Seat[] | null>(null);
   const [showtime, setShowtime] = useState<any>(null);
   const [selected, setSelected] = useState<Seat | null>(null);
-  const [phone, setPhone] = useState('');
   const [holding, setHolding] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,14 +44,10 @@ export function SeatMapPage() {
 
   async function handleHold() {
     if (!showtimeId || !selected) return;
-    if (!/^\+?\d{10,14}$/.test(phone.trim())) {
-      setError('Please enter a valid phone number, e.g. +8801700000000');
-      return;
-    }
     setHolding(true);
     setError(null);
     try {
-      const res = await api.holdSeat(showtimeId, selected.id, phone.trim());
+      const res = await api.holdSeat(showtimeId, selected.id);
       navigate(`/bookings/${res.booking_ref}`);
     } catch (e) {
       if (e instanceof ApiRequestError && e.status === 409) {
@@ -163,32 +161,37 @@ export function SeatMapPage() {
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-            <input
-              type="tel"
-              placeholder="+8801700000000"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              className="bg-card border border-borderLight rounded-xl px-4 py-2.5 text-sm w-full sm:w-60 outline-none focus:border-primary text-textPrimary shadow-sm"
-            />
-            <button
-              onClick={handleHold}
-              disabled={holding}
-              className="px-6 py-2.5 rounded-xl bg-primary hover:bg-primaryDark text-white font-medium text-sm transition-colors shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {holding ? (
-                <>
-                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  Reserving...
-                </>
-              ) : (
-                'Hold Seat (2 min)'
-              )}
-            </button>
-          </div>
+          {user ? (
+            <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+              <button
+                onClick={handleHold}
+                disabled={holding}
+                className="px-6 py-2.5 rounded-xl bg-primary hover:bg-primaryDark text-white font-medium text-sm transition-colors shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {holding ? (
+                  <>
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Reserving...
+                  </>
+                ) : (
+                  'Hold Seat (2 min)'
+                )}
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+              <span className="text-sm text-textSecondary font-semibold">Please sign in to make a booking</span>
+              <Link
+                to={`/login?redirect=${encodeURIComponent('/showtimes/' + showtimeId)}`}
+                className="px-6 py-2.5 rounded-xl bg-primary hover:bg-primaryDark text-white font-bold text-sm transition-colors text-center shadow-md shadow-primary/25 hover:-translate-y-0.5"
+              >
+                Sign In to Book
+              </Link>
+            </div>
+          )}
         </Card>
       )}
 

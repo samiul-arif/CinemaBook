@@ -3,6 +3,7 @@ import cors from 'cors';
 import morgan from 'morgan';
 import { env } from './config/env';
 import { apiRouter } from './routes';
+import { authRouter } from './routes/auth';
 import { errorHandler } from './middleware/errorHandler';
 import { requestIdMiddleware } from './middleware/requestId';
 
@@ -80,6 +81,7 @@ export function createApp() {
     }
   });
 
+  app.use('/auth', authRouter);
   app.use('/api', apiRouter);
 
   app.use((req, res) => {

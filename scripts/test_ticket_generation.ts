@@ -4,6 +4,20 @@ async function testTicketGeneration() {
   console.log('=== Testing E-Ticket Generation & Verification Endpoints ===\n');
 
   try {
+    // Register and get token
+    const regRes = await fetch(`${BASE_URL}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Test Agent',
+        email: `test_agent_${Date.now()}@example.com`,
+        phone: `+88017${Math.floor(10000000 + Math.random() * 90000000)}`,
+        password: 'Password123!',
+        confirmPassword: 'Password123!'
+      })
+    });
+    const { token } = (await regRes.json()) as any;
+
     // 1. Get showtime and available seat
     const movies = await fetch(`${BASE_URL}/api/movies`).then((r) => r.json());
     const showtimes = await fetch(`${BASE_URL}/api/movies/${movies[0].id}/showtimes`).then((r) => r.json());
@@ -13,7 +27,10 @@ async function testTicketGeneration() {
     // 2. Hold seat
     const hold = await fetch(`${BASE_URL}/api/showtimes/${showtimes[0].id}/seats/${avail.id}/hold`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify({ phone: '+8801784738289' }),
     }).then((r) => r.json());
 
@@ -21,10 +38,16 @@ async function testTicketGeneration() {
     console.log(`[Step 1] Created Hold: ${ref}`);
 
     // 3. OTP send & verify
-    await fetch(`${BASE_URL}/api/bookings/${ref}/otp/send`, { method: 'POST' });
+    await fetch(`${BASE_URL}/api/bookings/${ref}/otp/send`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
     await fetch(`${BASE_URL}/api/bookings/${ref}/otp/verify`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify({ code: '123456' }),
     });
     console.log('[Step 2] OTP Verified');
@@ -47,7 +70,10 @@ async function testTicketGeneration() {
     console.log('[Step 4] Calling POST /api/bookings/:ref/ticket...');
     const ticketRes = await fetch(`${BASE_URL}/api/bookings/${ref}/ticket`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
     });
 
     console.log(`Ticket endpoint status: ${ticketRes.status}`);

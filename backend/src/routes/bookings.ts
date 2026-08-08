@@ -8,29 +8,61 @@ import { sendOtp, verifyOtp } from '../services/otpService';
 import { initiatePayment } from '../services/paymentService';
 import { generateTicket } from '../services/ticketService';
 import { holdTtlSeconds } from '../config/env';
-
 import { rateLimiter } from '../middleware/rateLimiter';
+import { requireAuth } from '../middleware/auth';
+import { getUserBookings } from '../services/authService';
 
 export const bookingsRouter = Router();
 
 /**
- * Judging hook: "the exact request for holding a seat" - documented in README.
- *
+ * GET /api/bookings/me
+ * Retrieves all bookings for the currently authenticated user
+ */
+bookingsRouter.get(
+  '/bookings/me',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const userId = req.user!.id;
+    const bookings = await getUserBookings(userId);
+    res.json(bookings);
+  })
+);
+
+/**
  * POST /api/showtimes/:showtimeId/seats/:seatId/hold
- * body: { "phone": "+8801xxxxxxxxx" }
+ *
+ * Phone number is derived from the authenticated user's JWT payload — no phone
+ * field is accepted from the request body. After a successful hold the OTP is
+ * dispatched automatically so the client lands directly on the verify screen.
  */
 bookingsRouter.post(
   '/showtimes/:showtimeId/seats/:seatId/hold',
   rateLimiter,
+  requireAuth,
   asyncHandler(async (req, res) => {
     const { showtimeId, seatId } = req.params;
-    const { phone } = req.body ?? {};
-    if (!phone || typeof phone !== 'string') {
-      throw new ApiError(400, 'PHONE_REQUIRED', 'phone is required to hold a seat');
+
+    // Phone comes from the authenticated user record — never from the client
+    const phone = req.user!.phone;
+    if (!phone) {
+      throw new ApiError(400, 'PHONE_MISSING', 'No phone number on file. Please update your profile.');
     }
 
     const bookingRef = newBookingRef();
-    const { seat, holdExpiresAt } = await holdSeat({ showtimeId, seatId, phone, bookingRef });
+    const { seat, holdExpiresAt } = await holdSeat({
+      showtimeId,
+      seatId,
+      phone,
+      bookingRef,
+      userId: req.user!.id,
+    });
+
+    // Auto-send OTP immediately — client skips the "Send OTP" step
+    try {
+      await sendOtp(bookingRef);
+    } catch {
+      // Non-fatal: client can resend from the booking page if gateway is down
+    }
 
     res.status(201).json({
       booking_ref: bookingRef,
@@ -43,23 +75,38 @@ bookingsRouter.post(
 
 bookingsRouter.get(
   '/bookings/:ref',
+  requireAuth,
   asyncHandler(async (req, res) => {
-    res.json(await getBookingByRef(req.params.ref));
+    const booking = await getBookingByRef(req.params.ref);
+    if (booking.user_id && booking.user_id !== req.user!.id) {
+      throw new ApiError(403, 'FORBIDDEN', 'You do not have permission to view this booking');
+    }
+    res.json(booking);
   })
 );
 
 bookingsRouter.post(
   '/bookings/:ref/otp/send',
+  requireAuth,
   asyncHandler(async (req, res) => {
+    const booking = await getBookingByRef(req.params.ref);
+    if (booking.user_id && booking.user_id !== req.user!.id) {
+      throw new ApiError(403, 'FORBIDDEN', 'You do not have permission to modify this booking');
+    }
     res.status(202).json(await sendOtp(req.params.ref));
   })
 );
 
 bookingsRouter.post(
   '/bookings/:ref/otp/verify',
+  requireAuth,
   asyncHandler(async (req, res) => {
     const { code } = req.body ?? {};
     if (!code) throw new ApiError(400, 'CODE_REQUIRED', 'code is required');
+    const booking = await getBookingByRef(req.params.ref);
+    if (booking.user_id && booking.user_id !== req.user!.id) {
+      throw new ApiError(403, 'FORBIDDEN', 'You do not have permission to modify this booking');
+    }
     const result = await verifyOtp(req.params.ref, code);
     if (!result.verified) {
       return res.status(400).json({ verified: false, message: 'Incorrect or expired code' });
@@ -79,7 +126,12 @@ bookingsRouter.post(
  */
 bookingsRouter.post(
   '/bookings/:ref/pay',
+  requireAuth,
   asyncHandler(async (req, res) => {
+    const booking = await getBookingByRef(req.params.ref);
+    if (booking.user_id && booking.user_id !== req.user!.id) {
+      throw new ApiError(403, 'FORBIDDEN', 'You do not have permission to pay for this booking');
+    }
     const mode = req.header('X-Mock-Mode') as any;
     const force = req.header('X-Mock-Force') as any;
     const result = await initiatePayment(req.params.ref, { mode, force });
@@ -93,7 +145,12 @@ bookingsRouter.post(
  */
 bookingsRouter.post(
   '/bookings/:ref/ticket',
+  requireAuth,
   asyncHandler(async (req, res) => {
+    const booking = await getBookingByRef(req.params.ref);
+    if (booking.user_id && booking.user_id !== req.user!.id) {
+      throw new ApiError(403, 'FORBIDDEN', 'You do not have permission to generate a ticket for this booking');
+    }
     const ticket = await generateTicket(req.params.ref);
     res.json(ticket);
   })

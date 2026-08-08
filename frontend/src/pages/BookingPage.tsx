@@ -36,6 +36,16 @@ export function BookingPage() {
     return () => clearInterval(id);
   }, [bookingRef]);
 
+  // Auto-show OTP input as soon as the booking loads in HOLD state.
+  // The backend already sent OTP during holdSeat; we mark it as sent here
+  // so the input is immediately visible (and Resend is available if needed).
+  useEffect(() => {
+    if (booking?.status === 'HOLD' && !otpSent) {
+      setOtpSent(true);
+      setMessage('OTP sent to your registered phone number.');
+    }
+  }, [booking?.status]);
+
   const step = useMemo(() => {
     if (!booking) return 0;
     if (booking.status === 'CONFIRMED') return 4;
@@ -149,7 +159,11 @@ export function BookingPage() {
         </div>
         <div className="text-right">
           <div className="text-2xl font-bold text-primary font-mono">৳{booking.amount}</div>
-          <div className="text-xs text-textSecondary">{booking.phone}</div>
+          {booking.phone && (
+            <div className="text-xs text-textSecondary font-mono">
+              {booking.phone.replace(/(\+?\d{5})(\d+)(\d{2})/, (_m, s, _mid, e) => `${s}${'*'.repeat(_mid.length)}${e}`)}
+            </div>
+          )}
         </div>
       </div>
 
@@ -190,48 +204,49 @@ export function BookingPage() {
             </span>
           </div>
 
-          <p className="text-sm text-textSecondary">
-            Verify your mobile number via OTP code to proceed to checkout.
-          </p>
+          {/* Masked phone display */}
+          <div className="flex items-center gap-2 text-sm text-textSecondary">
+            <svg className="w-4 h-4 text-primary flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.948V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+            </svg>
+            OTP sent to{' '}
+            <span className="font-mono font-semibold text-textPrimary">
+              {booking.phone
+                ? booking.phone.replace(/(\+?\d{5})(\d+)(\d{2})/, (_m, s, mid, e) => `${s}${'*'.repeat(mid.length)}${e}`)
+                : '—'}
+            </span>
+          </div>
 
-          {!otpSent ? (
-            <button
-              onClick={handleSendOtp}
-              disabled={busy || secondsLeft === 0}
-              className="w-full py-3 rounded-xl bg-primary hover:bg-primaryDark text-white font-medium text-sm transition-colors shadow-md disabled:opacity-50"
-            >
-              {busy ? 'Sending OTP Code...' : 'Send Verification OTP'}
-            </button>
-          ) : (
-            <div className="space-y-3">
-              <div className="flex gap-2">
-                <input
-                  value={otpCode}
-                  onChange={(e) => setOtpCode(e.target.value)}
-                  placeholder="Enter 123456"
-                  className="bg-surface border border-borderLight rounded-xl px-4 py-2.5 text-sm w-full outline-none focus:border-primary font-mono text-textPrimary"
-                />
-                <button
-                  onClick={handleVerifyOtp}
-                  disabled={busy || secondsLeft === 0}
-                  className="px-6 py-2.5 rounded-xl bg-primary hover:bg-primaryDark text-white font-medium text-sm transition-colors shadow-md disabled:opacity-50 whitespace-nowrap"
-                >
-                  Verify
-                </button>
-              </div>
-
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-textTertiary">Mock code: 123456</span>
-                <button
-                  onClick={handleSendOtp}
-                  disabled={busy}
-                  className="text-primary hover:underline font-medium"
-                >
-                  Resend Code
-                </button>
-              </div>
+          {/* OTP Input — always visible (OTP already sent by backend on hold) */}
+          <div className="space-y-3">
+            <div className="flex gap-2">
+              <input
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value)}
+                placeholder="Enter 6-digit OTP"
+                maxLength={6}
+                className="bg-surface border border-borderLight rounded-xl px-4 py-2.5 text-sm w-full outline-none focus:border-primary font-mono text-textPrimary tracking-widest"
+              />
+              <button
+                onClick={handleVerifyOtp}
+                disabled={busy || secondsLeft === 0 || otpCode.length === 0}
+                className="px-6 py-2.5 rounded-xl bg-primary hover:bg-primaryDark text-white font-medium text-sm transition-colors shadow-md disabled:opacity-50 whitespace-nowrap"
+              >
+                {busy ? 'Verifying...' : 'Verify'}
+              </button>
             </div>
-          )}
+
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-textTertiary">Mock OTP code: <span className="font-mono font-bold">123456</span></span>
+              <button
+                onClick={handleSendOtp}
+                disabled={busy}
+                className="text-primary hover:underline font-medium"
+              >
+                Resend Code
+              </button>
+            </div>
+          </div>
         </Card>
       )}
 

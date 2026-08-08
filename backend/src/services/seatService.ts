@@ -76,8 +76,9 @@ export async function holdSeat(params: {
   seatId: string;
   phone: string;
   bookingRef: string;
+  userId?: string;
 }): Promise<{ seat: Seat; holdExpiresAt: Date }> {
-  const { showtimeId, seatId, phone, bookingRef } = params;
+  const { showtimeId, seatId, phone, bookingRef, userId } = params;
   const ttl = holdTtlSeconds();
 
   const result = await withTransaction(async (client: PoolClient) => {
@@ -115,10 +116,10 @@ export async function holdSeat(params: {
     const seat = updateResult.rows[0];
 
     const bookingInsert = await client.query(
-      `INSERT INTO bookings (booking_ref, showtime_id, seat_id, phone, amount, hold_expires_at, status)
-       VALUES ($1, $2, $3, $4, $5, $6, 'HOLD')
+      `INSERT INTO bookings (booking_ref, showtime_id, seat_id, phone, user_id, amount, hold_expires_at, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'HOLD')
        RETURNING *`,
-      [bookingRef, showtimeId, seatId, phone, seat.price, holdExpiresAt.toISOString()]
+      [bookingRef, showtimeId, seatId, phone, userId ?? null, seat.price, holdExpiresAt.toISOString()]
     );
 
     return { seat, booking: bookingInsert.rows[0], holdExpiresAt };

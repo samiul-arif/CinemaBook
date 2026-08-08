@@ -14,6 +14,7 @@ export interface Booking {
   otp_verified: boolean;
   otp_attempts: number;
   hold_expires_at: string;
+  user_id?: string | null;
   created_at: string;
   updated_at: string;
 }

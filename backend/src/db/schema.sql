@@ -60,12 +60,27 @@ CREATE INDEX IF NOT EXISTS idx_seats_showtime_status ON seats(showtime_id, statu
 CREATE INDEX IF NOT EXISTS idx_seats_hold_expiry ON seats(status, hold_expires_at)
   WHERE status = 'HELD';
 
+-- 0. Users Table
+CREATE TABLE IF NOT EXISTS users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  email TEXT NOT NULL UNIQUE,
+  phone TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);
+
 -- 5. Bookings Table (Includes ticket generation, HMAC anti-forgery signatures, and gate check-in)
 CREATE TABLE IF NOT EXISTS bookings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   booking_ref TEXT NOT NULL UNIQUE, -- human/gateway-facing reference, e.g. bk_xxxxx
   showtime_id UUID NOT NULL REFERENCES showtimes(id),
   seat_id UUID NOT NULL REFERENCES seats(id),
+  user_id UUID REFERENCES users(id) ON DELETE SET NULL,
   phone TEXT NOT NULL,
   amount NUMERIC(10, 2) NOT NULL,
   currency TEXT NOT NULL DEFAULT 'BDT',
@@ -86,6 +101,7 @@ CREATE TABLE IF NOT EXISTS bookings (
 
 CREATE INDEX IF NOT EXISTS idx_bookings_showtime ON bookings(showtime_id);
 CREATE INDEX IF NOT EXISTS idx_bookings_seat ON bookings(seat_id);
+CREATE INDEX IF NOT EXISTS idx_bookings_user_id ON bookings(user_id);
 CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings(status);
 
 -- 6. Payments Table

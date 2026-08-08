@@ -4,6 +4,20 @@ async function runPaymentMatrixTest() {
   console.log('=== Starting Problems 3-7 Payment Test Matrix ===\n');
 
   try {
+    // Register and get token
+    const regRes = await fetch(`${BASE_URL}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Payment Agent',
+        email: `payment_agent_${Date.now()}@example.com`,
+        phone: `+88017${Math.floor(10000000 + Math.random() * 90000000)}`,
+        password: 'Password123!',
+        confirmPassword: 'Password123!'
+      })
+    });
+    const { token } = (await regRes.json()) as any;
+
     // 1. Get a showtime and available seat
     const moviesRes = await fetch(`${BASE_URL}/api/movies`).then((r) => r.json());
     const movieId = moviesRes[0].id;
@@ -20,15 +34,24 @@ async function runPaymentMatrixTest() {
     async function holdAndVerifyOtp(seatId: string) {
       const holdRes = await fetch(`${BASE_URL}/api/showtimes/${showtimeId}/seats/${seatId}/hold`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ phone: '+8801700000000' }),
       }).then((r) => r.json());
       const ref = holdRes.booking_ref;
 
-      await fetch(`${BASE_URL}/api/bookings/${ref}/otp/send`, { method: 'POST' });
+      await fetch(`${BASE_URL}/api/bookings/${ref}/otp/send`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       await fetch(`${BASE_URL}/api/bookings/${ref}/otp/verify`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ code: '123456' }),
       });
 
@@ -42,13 +65,18 @@ async function runPaymentMatrixTest() {
 
     const payRes1 = await fetch(`${BASE_URL}/api/bookings/${ref1}/pay`, {
       method: 'POST',
-      headers: { 'X-Mock-Mode': 'deterministic' },
+      headers: {
+        'X-Mock-Mode': 'deterministic',
+        'Authorization': `Bearer ${token}`
+      },
     });
     console.log(`Pay request HTTP status: ${payRes1.status} (expected 202)`);
 
     // Wait for callback processing (deterministic mode takes 2s)
     await new Promise((r) => setTimeout(r, 3000));
-    const booking1 = await fetch(`${BASE_URL}/api/bookings/${ref1}`).then((r) => r.json());
+    const booking1 = await fetch(`${BASE_URL}/api/bookings/${ref1}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    }).then((r) => r.json());
     console.log(`Booking Status after callback: ${booking1.status} (expected CONFIRMED)`);
 
     // --- Scenario 2: Forced Failure (X-Mock-Force: fail) ---
@@ -58,11 +86,16 @@ async function runPaymentMatrixTest() {
 
     await fetch(`${BASE_URL}/api/bookings/${ref2}/pay`, {
       method: 'POST',
-      headers: { 'X-Mock-Force': 'fail' },
+      headers: {
+        'X-Mock-Force': 'fail',
+        'Authorization': `Bearer ${token}`
+      },
     });
 
     await new Promise((r) => setTimeout(r, 1000));
-    const booking2 = await fetch(`${BASE_URL}/api/bookings/${ref2}`).then((r) => r.json());
+    const booking2 = await fetch(`${BASE_URL}/api/bookings/${ref2}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    }).then((r) => r.json());
     console.log(`Booking Status after failed callback: ${booking2.status} (expected FAILED)`);
 
     // --- Scenario 3: Duplicate Callback Idempotency ---
@@ -102,12 +135,17 @@ async function runPaymentMatrixTest() {
 
     const raceRes = await fetch(`${BASE_URL}/api/bookings/${ref3}/pay`, {
       method: 'POST',
-      headers: { 'X-Mock-Force': 'race' },
+      headers: {
+        'X-Mock-Force': 'race',
+        'Authorization': `Bearer ${token}`
+      },
     });
     console.log(`Race pay request HTTP status: ${raceRes.status}`);
 
     await new Promise((r) => setTimeout(r, 1000));
-    const booking3 = await fetch(`${BASE_URL}/api/bookings/${ref3}`).then((r) => r.json());
+    const booking3 = await fetch(`${BASE_URL}/api/bookings/${ref3}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    }).then((r) => r.json());
     console.log(`Booking Status after race: ${booking3.status} (expected CONFIRMED)`);
 
     console.log('\n=== All Payment Matrix Tests Completed Successfully! ===');
