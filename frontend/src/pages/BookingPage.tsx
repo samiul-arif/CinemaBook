@@ -72,9 +72,13 @@ export function BookingPage() {
     setBusy(true);
     setMessage(null);
     try {
-      await api.sendOtp(bookingRef);
+      const res = await api.sendOtp(bookingRef);
       setOtpSent(true);
-      setMessage('Verification code sent. Use test code 123456.');
+      if (res.code) {
+        setMessage(`Verification code sent. Code: ${res.code}`);
+      } else {
+        setMessage('Verification code sent. Check your logs/phone.');
+      }
     } catch (e) {
       setMessage((e as Error).message);
     } finally {
@@ -89,7 +93,7 @@ export function BookingPage() {
     try {
       const res = await api.verifyOtp(bookingRef, otpCode);
       if (!res.verified) {
-        setMessage('That code did not match. Try using test code 123456.');
+        setMessage('That code did not match. Please try again.');
       } else {
         const fresh = await api.getBooking(bookingRef);
         setBooking(fresh);
@@ -237,7 +241,7 @@ export function BookingPage() {
             </div>
 
             <div className="flex justify-between items-center text-xs">
-              <span className="text-textTertiary">Mock OTP code: <span className="font-mono font-bold">123456</span></span>
+              <span className="text-textTertiary">Mock OTP code: <span className="font-mono font-bold">{booking.otp_code || 'Sent to phone'}</span></span>
               <button
                 onClick={handleSendOtp}
                 disabled={busy}

@@ -38,17 +38,18 @@ async function testTicketGeneration() {
     console.log(`[Step 1] Created Hold: ${ref}`);
 
     // 3. OTP send & verify
-    await fetch(`${BASE_URL}/api/bookings/${ref}/otp/send`, {
+    const otpSendRes = await fetch(`${BASE_URL}/api/bookings/${ref}/otp/send`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${token}` }
-    });
+    }).then((r) => r.json());
+
     await fetch(`${BASE_URL}/api/bookings/${ref}/otp/verify`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
-      body: JSON.stringify({ code: '123456' }),
+      body: JSON.stringify({ code: otpSendRes.code || '123456' }),
     });
     console.log('[Step 2] OTP Verified');
 

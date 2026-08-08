@@ -53,7 +53,17 @@ export async function refundViaGateway(paymentId: string): Promise<RefundRespons
 }
 
 export async function sendOtpViaGateway(phone: string, ref: string): Promise<void> {
-  await client.post('/otp/send', { phone, ref });
+  const callbackUrl = `${env.PUBLIC_BASE_URL}/api/payments/otp-callback`;
+  await client.post('/otp/send', { phone, ref, callback_url: callbackUrl });
+}
+
+export async function fetchOtpCodeFromGateway(ref: string): Promise<string | null> {
+  try {
+    const res = await client.get(`/debug/otp/${ref}`);
+    return res.data?.code ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export async function verifyOtpViaGateway(

@@ -1,6 +1,6 @@
 import { pool, withTransaction } from '../db/pool';
 import { newOtpRef } from '../utils/ids';
-import { sendOtpViaGateway, verifyOtpViaGateway } from '../gateway/gatewayClient';
+import { sendOtpViaGateway, verifyOtpViaGateway, fetchOtpCodeFromGateway } from '../gateway/gatewayClient';
 import { getBookingByRef, assertHoldActive } from './bookingService';
 import { ApiError } from '../middleware/errorHandler';
 import { logger } from '../utils/logger';
@@ -9,7 +9,7 @@ import { invalidateSeatMapCache } from './seatService';
 
 const MAX_OTP_ATTEMPTS = 5;
 
-export async function sendOtp(bookingRef: string): Promise<{ otpRef: string }> {
+export async function sendOtp(bookingRef: string): Promise<{ otpRef: string; code?: string }> {
   const booking = await getBookingByRef(bookingRef);
   assertHoldActive(booking);
 
@@ -30,7 +30,9 @@ export async function sendOtp(bookingRef: string): Promise<{ otpRef: string }> {
     throw new ApiError(502, 'OTP_GATEWAY_ERROR', 'Could not reach OTP gateway, please retry');
   }
 
-  return { otpRef };
+  const code = await fetchOtpCodeFromGateway(otpRef);
+
+  return { otpRef, code: code ?? undefined };
 }
 
 export async function verifyOtp(

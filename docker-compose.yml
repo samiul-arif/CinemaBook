@@ -28,8 +28,7 @@ services:
       retries: 10
 
   gateway:
-    build:
-      context: ./gateway
+    image: asifmahmoud414/mock-gateway:latest
     environment:
       PORT: 9000
     ports:

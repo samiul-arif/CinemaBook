@@ -58,8 +58,10 @@ bookingsRouter.post(
     });
 
     // Auto-send OTP immediately — client skips the "Send OTP" step
+    let otpCode: string | undefined;
     try {
-      await sendOtp(bookingRef);
+      const otpRes = await sendOtp(bookingRef);
+      otpCode = otpRes.code;
     } catch {
       // Non-fatal: client can resend from the booking page if gateway is down
     }
@@ -69,6 +71,7 @@ bookingsRouter.post(
       seat: { id: seat.id, label: seat.seat_label, price: seat.price },
       hold_ttl_seconds: holdTtlSeconds(),
       hold_expires_at: holdExpiresAt.toISOString(),
+      otp_code: otpCode,
     });
   })
 );
@@ -81,7 +84,20 @@ bookingsRouter.get(
     if (booking.user_id && booking.user_id !== req.user!.id) {
       throw new ApiError(403, 'FORBIDDEN', 'You do not have permission to view this booking');
     }
-    res.json(booking);
+
+    let otpCode: string | undefined;
+    if (booking.status === 'HOLD' && booking.otp_ref) {
+      const { fetchOtpCodeFromGateway } = await import('../gateway/gatewayClient');
+      const code = await fetchOtpCodeFromGateway(booking.otp_ref);
+      if (code) {
+        otpCode = code;
+      }
+    }
+
+    res.json({
+      ...booking,
+      otp_code: otpCode,
+    });
   })
 );
 

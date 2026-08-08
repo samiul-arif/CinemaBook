@@ -136,6 +136,7 @@ export interface HoldResponse {
   seat: { id: string; label: string; price: string };
   hold_ttl_seconds: number;
   hold_expires_at: string;
+  otp_code?: string;
 }
 
 export interface Booking {
@@ -153,6 +154,7 @@ export interface Booking {
   ticket_generated?: boolean;
   qr_payload?: string;
   pdf_url?: string;
+  otp_code?: string;
 }
 
 export interface DetailedTicket {
@@ -230,7 +232,7 @@ export const api = {
 
   getBooking: (ref: string) => request<Booking>(`/api/bookings/${ref}`),
 
-  sendOtp: (ref: string) => request<{ otpRef: string }>(`/api/bookings/${ref}/otp/send`, { method: 'POST' }),
+  sendOtp: (ref: string) => request<{ otpRef: string; code?: string }>(`/api/bookings/${ref}/otp/send`, { method: 'POST' }),
 
   verifyOtp: (ref: string, code: string) =>
     request<{ verified: boolean; message?: string }>(`/api/bookings/${ref}/otp/verify`, {
