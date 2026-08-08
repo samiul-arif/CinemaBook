@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { api, ApiRequestError, Booking } from '../api/client';
+import { api, ApiRequestError, Booking, DetailedTicket } from '../api/client';
 import { Card } from '../components/ui/Card';
+import { TicketView } from '../components/TicketView';
 
 function useCountdown(target: string | null) {
   const [now, setNow] = useState(Date.now());
@@ -22,6 +23,8 @@ export function BookingPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [ticket, setTicket] = useState<DetailedTicket | null>(null);
+  const [generatingTicket, setGeneratingTicket] = useState(false);
 
   const secondsLeft = useCountdown(booking?.hold_expires_at ?? null);
 
@@ -103,6 +106,20 @@ export function BookingPage() {
       setMessage((e as Error).message);
     } finally {
       setPaying(false);
+    }
+  }
+
+  async function handleGenerateTicket() {
+    if (!bookingRef) return;
+    setGeneratingTicket(true);
+    setMessage(null);
+    try {
+      const t = await api.generateTicket(bookingRef);
+      setTicket(t);
+    } catch (e) {
+      setMessage((e as Error).message);
+    } finally {
+      setGeneratingTicket(false);
     }
   }
 
@@ -255,19 +272,57 @@ export function BookingPage() {
         </Card>
       )}
 
-      {/* CONFIRMED Ticket Display */}
+      {/* CONFIRMED Ticket Display & E-Ticket Generator */}
       {booking.status === 'CONFIRMED' && (
-        <Notice tone="success">
-          <div className="flex items-start gap-3">
-            <div className="p-2 rounded-xl bg-success/20 text-success text-2xl">🎟</div>
-            <div className="space-y-1">
-              <p className="font-bold text-lg text-textPrimary">Ticket Booking Confirmed!</p>
-              <p className="text-sm text-textSecondary">
-                Your seat has been permanently locked. Show reference <strong className="font-mono text-primary">{bookingRef}</strong> at the cinema counter.
-              </p>
+        <div className="space-y-6">
+          <Notice tone="success">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="p-2.5 rounded-2xl bg-success/20 text-success text-3xl">🎟️</div>
+                <div className="space-y-1">
+                  <p className="font-bold text-xl text-textPrimary">Booking Confirmed!</p>
+                  <p className="text-sm text-textSecondary">
+                    Your seat is permanently locked. Booking Ref:{' '}
+                    <strong className="font-mono text-primary">{bookingRef}</strong>
+                  </p>
+                </div>
+              </div>
             </div>
-          </div>
-        </Notice>
+          </Notice>
+
+          {!ticket ? (
+            <Card className="p-6 text-center space-y-4 border-primary/40 bg-gradient-to-b from-card to-primaryLight/10">
+              <div className="w-12 h-12 rounded-full bg-primaryLight text-primary flex items-center justify-center mx-auto text-2xl">
+                ✨
+              </div>
+              <div>
+                <h3 className="font-bold text-lg text-textPrimary">Ready to Entry</h3>
+                <p className="text-xs text-textSecondary max-w-sm mx-auto mt-1">
+                  Generate your official electronic cinema pass with unique QR & Barcode verification.
+                </p>
+              </div>
+              <button
+                onClick={handleGenerateTicket}
+                disabled={generatingTicket}
+                className="px-8 py-3.5 rounded-xl bg-primary hover:bg-primaryDark text-white font-bold text-sm transition-all shadow-lg hover:shadow-primary/30 flex items-center justify-center gap-2 mx-auto disabled:opacity-50"
+              >
+                {generatingTicket ? (
+                  <>
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Generating E-Ticket...
+                  </>
+                ) : (
+                  '🎫 Generate E-Ticket'
+                )}
+              </button>
+            </Card>
+          ) : (
+            <TicketView ticket={ticket} onClose={() => setTicket(null)} />
+          )}
+        </div>
       )}
 
       {message && (

@@ -176,3 +176,38 @@ body {
 .seat-selected {
   @apply bg-primary border-primary text-white font-bold shadow-md shadow-primary/30;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Print Utility Styles (Prints ONLY the ticket card)                          */
+/* -------------------------------------------------------------------------- */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  /* Hide everything on the page */
+  body * {
+    visibility: hidden;
+  }
+  /* Make only the printable ticket card visible */
+  .ticket-printable,
+  .ticket-printable * {
+    visibility: visible;
+  }
+  /* Format ticket to take up print container space cleanly */
+  .ticket-printable {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 100% !important;
+    max-width: 450px !important;
+    border: 2px solid #da7756 !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+  }
+  /* Hide shadows or decorative headers during print */
+  .print-hide {
+    display: none !important;
+  }
+}

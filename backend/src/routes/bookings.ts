@@ -6,6 +6,7 @@ import { newBookingRef } from '../utils/ids';
 import { getBookingByRef } from '../services/bookingService';
 import { sendOtp, verifyOtp } from '../services/otpService';
 import { initiatePayment } from '../services/paymentService';
+import { generateTicket } from '../services/ticketService';
 import { holdTtlSeconds } from '../config/env';
 
 export const bookingsRouter = Router();
@@ -80,5 +81,17 @@ bookingsRouter.post(
     const force = req.header('X-Mock-Force') as any;
     const result = await initiatePayment(req.params.ref, { mode, force });
     res.status(202).json(result);
+  })
+);
+
+/**
+ * Generate Printable E-Ticket with QR Code Payload
+ * POST /api/bookings/:ref/ticket
+ */
+bookingsRouter.post(
+  '/bookings/:ref/ticket',
+  asyncHandler(async (req, res) => {
+    const ticket = await generateTicket(req.params.ref);
+    res.json(ticket);
   })
 );

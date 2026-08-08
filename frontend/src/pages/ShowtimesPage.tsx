@@ -43,12 +43,12 @@ export function ShowtimesPage() {
       </Link>
 
       {/* Movie Details Hero Banner */}
-      <Card className="overflow-hidden">
-        <div className="flex flex-col md:flex-row gap-6 items-center md:items-start">
+      <Card padding="none" className="overflow-hidden">
+        <div className="flex flex-col md:flex-row gap-5 p-5 items-center md:items-start">
           <img
             src={movie.poster_url}
             alt={movie.title}
-            className="w-40 sm:w-48 aspect-[2/3] object-cover rounded-xl shadow-md border border-borderLight"
+            className="w-28 sm:w-32 md:w-36 aspect-[2/3] object-cover rounded-xl shadow-md border border-borderLight"
           />
           <div className="flex-1 text-center md:text-left">
             <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mb-3">

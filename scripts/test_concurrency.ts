@@ -1,5 +1,3 @@
-import axios from 'axios';
-
 const BASE_URL = process.env.API_BASE_URL || 'http://localhost:4000';
 
 async function runConcurrencyTest() {
@@ -7,22 +5,22 @@ async function runConcurrencyTest() {
 
   try {
     // 1. Fetch movies to get a valid showtime
-    const moviesRes = await axios.get(`${BASE_URL}/api/movies`);
-    if (!moviesRes.data || moviesRes.data.length === 0) {
+    const moviesRes = await fetch(`${BASE_URL}/api/movies`).then((r) => r.json());
+    if (!moviesRes || moviesRes.length === 0) {
       throw new Error('No movies found');
     }
-    const movieId = moviesRes.data[0].id;
+    const movieId = moviesRes[0].id;
 
     // 2. Fetch showtimes for movie
-    const showtimesRes = await axios.get(`${BASE_URL}/api/movies/${movieId}/showtimes`);
-    if (!showtimesRes.data || showtimesRes.data.length === 0) {
+    const showtimesRes = await fetch(`${BASE_URL}/api/movies/${movieId}/showtimes`).then((r) => r.json());
+    if (!showtimesRes || showtimesRes.length === 0) {
       throw new Error('No showtimes found');
     }
-    const showtimeId = showtimesRes.data[0].id;
+    const showtimeId = showtimesRes[0].id;
 
     // 3. Fetch seat map to select 1 specific available seat
-    const seatsRes = await axios.get(`${BASE_URL}/api/showtimes/${showtimeId}/seats`);
-    const availableSeats = seatsRes.data.filter((s: any) => s.status === 'AVAILABLE');
+    const seatsRes = await fetch(`${BASE_URL}/api/showtimes/${showtimeId}/seats`).then((r) => r.json());
+    const availableSeats = seatsRes.filter((s: any) => s.status === 'AVAILABLE');
     if (availableSeats.length === 0) {
       throw new Error('No available seats found for testing');
     }
@@ -32,21 +30,22 @@ async function runConcurrencyTest() {
 
     // 4. Fire 100 concurrent hold requests
     const CONCURRENCY_COUNT = 100;
-    const promises: Promise<{ status: number; data?: any; error?: any }>[] = [];
+    const promises: Promise<{ status: number; data?: any }>[] = [];
 
     console.log(`Launching ${CONCURRENCY_COUNT} simultaneous hold requests...`);
     const startTime = Date.now();
 
     for (let i = 0; i < CONCURRENCY_COUNT; i++) {
-      const p = axios
-        .post(`${BASE_URL}/api/showtimes/${showtimeId}/seats/${targetSeat.id}/hold`, {
+      const p = fetch(`${BASE_URL}/api/showtimes/${showtimeId}/seats/${targetSeat.id}/hold`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           phone: `+88017${Math.floor(10000000 + Math.random() * 9000000)}`,
-        })
-        .then((res) => ({ status: res.status, data: res.data }))
-        .catch((err) => ({
-          status: err.response ? err.response.status : 500,
-          error: err.response ? err.response.data : err.message,
-        }));
+        }),
+      }).then(async (res) => ({
+        status: res.status,
+        data: await res.json().catch(() => ({})),
+      }));
       promises.push(p);
     }
 
@@ -65,8 +64,8 @@ async function runConcurrencyTest() {
     console.log(`Other Errors: ${otherErrors.length}`);
 
     // 5. Verify Seat Map state
-    const updatedSeatsRes = await axios.get(`${BASE_URL}/api/showtimes/${showtimeId}/seats`);
-    const updatedTargetSeat = updatedSeatsRes.data.find((s: any) => s.id === targetSeat.id);
+    const updatedSeatsRes = await fetch(`${BASE_URL}/api/showtimes/${showtimeId}/seats`).then((r) => r.json());
+    const updatedTargetSeat = updatedSeatsRes.find((s: any) => s.id === targetSeat.id);
 
     console.log(`Updated Seat Status: ${updatedTargetSeat.status}`);
 

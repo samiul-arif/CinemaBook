@@ -9,9 +9,8 @@ export function Layout() {
     <div className="min-h-screen flex flex-col relative text-textPrimary selection:bg-primary selection:text-white transition-colors duration-200">
       <Background />
 
-      {/* Header Panel */}
       <header className="glass-panel sticky top-0 z-30 transition-all duration-200">
-        <div className="max-w-6xl mx-auto px-5 py-3.5 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-5 py-3.5 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-3 group">
             <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/30 flex items-center justify-center text-primary group-hover:scale-105 transition-transform">
               <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
@@ -56,13 +55,12 @@ export function Layout() {
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-6xl mx-auto w-full px-5 py-10 relative z-10">
+      <main className="flex-1 max-w-7xl mx-auto w-full px-5 py-10 relative z-10">
         <Outlet />
       </main>
 
-      {/* Footer */}
       <footer className="border-t border-borderLight/60 py-8 text-center text-xs text-textTertiary relative z-10 bg-surface/30 backdrop-blur-sm">
-        <div className="max-w-6xl mx-auto px-5 flex flex-col sm:flex-row justify-between items-center gap-3">
+        <div className="max-w-7xl mx-auto px-5 flex flex-col sm:flex-row justify-between items-center gap-3">
           <p>© {new Date().getFullYear()} CinemaSeat — Built with ResourceX Design System</p>
           <div className="flex items-center gap-4 text-textSecondary">
             <span className="inline-flex items-center gap-1.5">

@@ -27,7 +27,7 @@ export function MoviesPage() {
           <div className="h-8 w-48 bg-surfaceVariant animate-pulse rounded-lg mb-2" />
           <div className="h-4 w-72 bg-surfaceVariant animate-pulse rounded-md" />
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
           {[1, 2, 3, 4].map((n) => (
             <div key={n} className="rounded-2xl border border-borderLight bg-card p-3 h-80 animate-pulse">
               <div className="w-full aspect-[2/3] bg-surfaceVariant rounded-xl mb-3" />
@@ -64,7 +64,7 @@ export function MoviesPage() {
       </div>
 
       {/* Movie Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
         {movies.map((m) => (
           <Card
             key={m.id}

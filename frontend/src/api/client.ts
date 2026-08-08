@@ -84,6 +84,47 @@ export interface Booking {
   otp_ref: string | null;
   otp_verified: boolean;
   hold_expires_at: string;
+  ticket_generated?: boolean;
+  qr_payload?: string;
+  pdf_url?: string;
+}
+
+export interface DetailedTicket {
+  booking_ref: string;
+  movie: {
+    title: string;
+    genre: string;
+    duration_min: number;
+    language: string;
+    poster_url: string;
+  };
+  theatre: {
+    name: string;
+    city: string;
+    screen_name: string;
+  };
+  showtime: {
+    start_time: string;
+  };
+  seat: {
+    seat_label: string;
+    seat_row: string;
+    seat_col: number;
+    seat_type: string;
+    price: string;
+  };
+  user: {
+    phone: string;
+  };
+  booking: {
+    amount: string;
+    currency: string;
+    status: string;
+    created_at: string;
+    ticket_generated: boolean;
+    qr_payload: string;
+    pdf_url: string;
+  };
 }
 
 export const api = {
@@ -111,4 +152,8 @@ export const api = {
 
   pay: (ref: string) =>
     request<{ paymentId: string; status: string }>(`/api/bookings/${ref}/pay`, { method: 'POST' }),
+
+  generateTicket: (ref: string) =>
+    request<DetailedTicket>(`/api/bookings/${ref}/ticket`, { method: 'POST' }),
+
 };
