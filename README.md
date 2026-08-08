@@ -52,6 +52,36 @@ The stack automatically handles:
 - **Backend API**: Starts Node/Express server on `http://localhost:4000`.
 - **Frontend SPA**: Starts Vite app on `http://localhost:5173`.
 
+### Running Services Manually (Development Mode)
+
+If you wish to run the backend and frontend services locally on your host machine during development:
+
+1. **Start the Database, Redis, and Mock Gateway dependencies**:
+   ```bash
+   # Spin up database, redis, and mock payment gateway only
+   docker compose up postgres redis mock-gateway -d
+   ```
+
+2. **Run Backend API Server**:
+   ```bash
+   cd backend
+   npm install
+   # Apply database migrations
+   npx tsx src/db/migrate.ts
+   # Start the Express server in development mode
+   npm run dev
+   ```
+   The backend will be running on `http://localhost:4000`.
+
+3. **Run Frontend App**:
+   ```bash
+   cd frontend
+   npm install
+   # Start the Vite development server
+   npm run dev
+   ```
+   The frontend will be running on `http://localhost:5173`.
+
 ---
 
 ## 3. Exact API Request Documentation (Judging Hooks)
