@@ -16,9 +16,15 @@ async function seed() {
   console.log('[seed] inserting movies...');
   const movies = await pool.query(`
     INSERT INTO movies (title, description, poster_url, duration_min, language, genre) VALUES
-    ('Spider-Man: Brand New Day', 'The midnight premiere everyone is fighting for.', 'https://picsum.photos/seed/spiderman/400/600', 148, 'English', 'Action/Sci-Fi'),
-    ('Priyo Bondhu', 'A Dhallywood romantic drama about friendship and distance.', 'https://picsum.photos/seed/priyobondhu/400/600', 132, 'Bangla', 'Drama'),
-    ('Hawa 2', 'Sequel to the acclaimed maritime thriller.', 'https://picsum.photos/seed/hawa2/400/600', 141, 'Bangla', 'Thriller'),
+    ('The Dark Knight', 'When the menace known as the Joker wreaks havoc and chaos on the people of Gotham, Batman must accept one of the greatest psychological and physical tests of his ability to fight injustice.', 'https://picsum.photos/seed/darkknight/400/600', 152, 'English', 'Action/Drama/DC/Nolan'),
+    ('Inception', 'A thief who steals corporate secrets through the use of dream-sharing technology is given the inverse task of planting an idea into the mind of a C.E.O.', 'https://picsum.photos/seed/inception/400/600', 148, 'English', 'Sci-Fi/Action/Nolan'),
+    ('Interstellar', 'When Earth becomes uninhabitable, a team of explorers travels through a wormhole in space in an attempt to ensure humanity''s survival.', 'https://picsum.photos/seed/interstellar/400/600', 169, 'English', 'Sci-Fi/Drama/Nolan'),
+    ('Oppenheimer', 'The story of American scientist J. Robert Oppenheimer and his role in the development of the atomic bomb.', 'https://picsum.photos/seed/oppenheimer/400/600', 180, 'English', 'Biography/Drama/Nolan'),
+    ('The Batman', 'When a sadistic serial killer begins murdering key political figures in Gotham, Batman is forced to investigate the city''s hidden corruption.', 'https://picsum.photos/seed/thebatman/400/600', 176, 'English', 'Action/Crime/DC'),
+    ('Joker: Folie à Deux', 'Failed comedian Arthur Fleck meets the love of his life, Harley Quinn, while incarcerated at Arkham State Hospital.', 'https://picsum.photos/seed/joker2/400/600', 138, 'English', 'Drama/Crime/DC'),
+    ('Avengers: Doomsday', 'The Avengers confront the threat of Doctor Doom in a multiversal clash.', 'https://picsum.photos/seed/avengersdoomsday/400/600', 150, 'English', 'Action/Sci-Fi/Marvel'),
+    ('Spider-Man: Brand New Day', 'The midnight premiere everyone is fighting for.', 'https://picsum.photos/seed/spiderman/400/600', 148, 'English', 'Action/Sci-Fi/Marvel'),
+    ('Iron Man 3', 'When Tony Stark''s world is torn apart by a formidable terrorist called the Mandarin, he starts an odyssey of rebuild and retribution.', 'https://picsum.photos/seed/ironman3/400/600', 130, 'English', 'Action/Sci-Fi/Marvel'),
     ('Dune: Part Three', 'The Bene Gesserit conspiracy reaches Arrakis.', 'https://picsum.photos/seed/dune3/400/600', 165, 'English', 'Sci-Fi')
     RETURNING id, title
   `);
@@ -26,9 +32,12 @@ async function seed() {
   console.log('[seed] inserting theatres...');
   const theatres = await pool.query(`
     INSERT INTO theatres (name, city, address) VALUES
+    ('Star Cineplex (Bashundhara City)', 'Dhaka', 'Bashundhara City, Dhaka'),
+    ('Star Cineplex (Shimanto Square)', 'Dhaka', 'Dhanmondi, Dhaka'),
     ('Silver Screen Cineplex', 'Chattogram', 'GEC Circle, Chattogram'),
-    ('Star Cineplex', 'Dhaka', 'Bashundhara City, Dhaka'),
-    ('Blockbuster Cinemas', 'Chattogram', 'Agrabad, Chattogram')
+    ('Grand Sylhet Cineplex', 'Sylhet', 'Airport Road, Sylhet'),
+    ('Liberty Plaza Cinema', 'Khulna', 'Jail Road, Khulna'),
+    ('Moyurakshi Cineplex', 'Rajshahi', 'Rajshahi Sadar, Rajshahi')
     RETURNING id, name
   `);
 

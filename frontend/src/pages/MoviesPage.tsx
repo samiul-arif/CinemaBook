@@ -29,8 +29,8 @@ export function MoviesPage() {
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
           {[1, 2, 3, 4].map((n) => (
-            <div key={n} className="rounded-2xl border border-borderLight bg-card p-3 h-80 animate-pulse">
-              <div className="w-full aspect-[2/3] bg-surfaceVariant rounded-xl mb-3" />
+            <div key={n} className="rounded-2xl border border-borderLight bg-card p-3 animate-pulse">
+              <div className="w-full aspect-square bg-surfaceVariant rounded-xl mb-3" />
               <div className="h-4 w-3/4 bg-surfaceVariant rounded mb-2" />
               <div className="h-3 w-1/2 bg-surfaceVariant rounded" />
             </div>
@@ -81,7 +81,7 @@ export function MoviesPage() {
 
             <div>
               {/* Poster Image Container */}
-              <div className="relative aspect-[2/3] overflow-hidden bg-surface rounded-t-2xl">
+              <div className="relative aspect-square overflow-hidden bg-surface rounded-t-2xl">
                 <img
                   src={m.poster_url}
                   alt={m.title}
