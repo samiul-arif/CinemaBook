@@ -9,6 +9,8 @@ import { initiatePayment } from '../services/paymentService';
 import { generateTicket } from '../services/ticketService';
 import { holdTtlSeconds } from '../config/env';
 
+import { rateLimiter } from '../middleware/rateLimiter';
+
 export const bookingsRouter = Router();
 
 /**
@@ -19,6 +21,7 @@ export const bookingsRouter = Router();
  */
 bookingsRouter.post(
   '/showtimes/:showtimeId/seats/:seatId/hold',
+  rateLimiter,
   asyncHandler(async (req, res) => {
     const { showtimeId, seatId } = req.params;
     const { phone } = req.body ?? {};
